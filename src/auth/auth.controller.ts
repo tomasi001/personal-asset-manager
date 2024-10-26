@@ -32,9 +32,10 @@ export class AuthController {
 
     try {
       const result = await this.authService.validatePrivyToken(privyToken);
-      return { accessToken: result.accessToken }; // Return the generated JWT
-    } catch (error) {
-      throw new UnauthorizedException('Invalid Privy token'); // Handle errors gracefully
+      // Return the generated JWT
+      return { accessToken: result.accessToken };
+    } catch {
+      throw new UnauthorizedException('Invalid Privy token');
     }
   }
 

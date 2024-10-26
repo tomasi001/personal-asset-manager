@@ -53,7 +53,7 @@ export class AuthService {
 
       // Return the generated access token.
       return { accessToken: ourToken };
-    } catch (error) {
+    } catch {
       // Handle invalid Privy token by throwing an UnauthorizedException.
       throw new UnauthorizedException('Invalid Privy token');
     }

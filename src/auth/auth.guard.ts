@@ -40,7 +40,7 @@ export class AuthGuard implements CanActivate {
       // Attach the user information (payload) to the request object for later use
       request.user = payload; // This allows access to user info in the route handler
       return true; // Allow the request to proceed
-    } catch (error) {
+    } catch {
       // If token verification fails, throw an UnauthorizedException
       throw new UnauthorizedException('Invalid token');
     }
