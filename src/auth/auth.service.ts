@@ -1,8 +1,8 @@
 // src/auth/auth.service.ts
-import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PrivyClient, AuthTokenClaims } from '@privy-io/server-auth';
+import { JwtService } from '@nestjs/jwt';
+import { AuthTokenClaims, PrivyClient } from '@privy-io/server-auth';
 import { UserService } from '../user/user.service';
 
 /**
@@ -56,7 +56,7 @@ export class AuthService {
       return { accessToken: ourToken };
     } catch {
       // Handle invalid Privy token by throwing an UnauthorizedException.
-      throw new UnauthorizedException('Invalid Privy token');
+      throw new ForbiddenException('Invalid or expired Privy token');
     }
   }
 }
