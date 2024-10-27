@@ -62,7 +62,8 @@ describe('AssetController', () => {
       const userId = 'user123';
       const expectedResult = [
         {
-          id: 'asset1',
+          userAssetId: 'userAsset1',
+          assetId: 'asset1',
           name: 'Asset 1',
           asset_type: 'ERC-20' as const,
           description: 'Description for Asset 1',
@@ -73,7 +74,8 @@ describe('AssetController', () => {
           quantity: 100,
         },
         {
-          id: 'asset2',
+          userAssetId: 'userAsset2',
+          assetId: 'asset2',
           name: 'Asset 2',
           asset_type: 'ERC-721' as const,
           description: 'Description for Asset 2',
@@ -98,7 +100,8 @@ describe('AssetController', () => {
       const assetId = 'asset1';
       const userId = 'user123';
       const expectedResult = {
-        id: 'asset1',
+        userAssetId: 'userAsset1',
+        assetId: 'asset1',
         name: 'Asset 1',
         asset_type: 'ERC-20' as const,
         description: 'Description for Asset 1',

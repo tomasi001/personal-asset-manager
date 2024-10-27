@@ -133,7 +133,7 @@ export class AssetService {
       .innerJoin('assets', 'assets.id', 'user_assets.asset_id')
       .where('user_assets.user_id', '=', userId)
       .select([
-        'user_assets.id as id',
+        'user_assets.id as userAssetId',
         'assets.id as assetId',
         'assets.name',
         'assets.asset_type',
