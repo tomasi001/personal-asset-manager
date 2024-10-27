@@ -3,7 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from './auth.service';
 import { AuthTokenClaims } from '@privy-io/server-auth';
-import { UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { UserService } from '../user/user.service';
 import { DatabaseService } from '../database/database.service';
 
@@ -42,8 +42,12 @@ describe('AuthService', () => {
   // Additional tests can be added here...
 
   it('should validate a valid Privy token and return a JWT', async () => {
-    const validToken =
-      'eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InBMYnFOODM3aXVMdGlBalNFWkhlN3JPUkxZRS1kMDcwY0lIeDl6bUx4dzAifQ.eyJzaWQiOiJjbTJxMzNubm0wMGpsMTN0cDI3eGY5cm81IiwiaXNzIjoicHJpdnkuaW8iLCJpYXQiOjE3Mjk5NDI1MDQsImF1ZCI6ImNtMnEwNDdzZzBnNnExMGpzcnhhZzBncXMiLCJzdWIiOiJkaWQ6cHJpdnk6Y20ycTEwMXF1MDI0NWJkZDhvaTc2cmFzdCIsImV4cCI6MTcyOTk0NjEwNH0.FROEm_O5C_KLQz6L0ZHCHMSY_AvttphI6_0V1nr6qTLc5YxXWPrCPFu02pDshJNWL91pE21OBv4eaMhd9dlzdg';
+    // const validToken =
+    // 'eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InBMYnFOODM3aXVMdGlBalNFWkhlN3JPUkxZRS1kMDcwY0lIeDl6bUx4dzAifQ.eyJzaWQiOiJjbTJxMzNubm0wMGpsMTN0cDI3eGY5cm81IiwiaXNzIjoicHJpdnkuaW8iLCJpYXQiOjE3Mjk5NDI1MDQsImF1ZCI6ImNtMnEwNDdzZzBnNnExMGpzcnhhZzBncXMiLCJzdWIiOiJkaWQ6cHJpdnk6Y20ycTEwMXF1MDI0NWJkZDhvaTc2cmFzdCIsImV4cCI6MTcyOTk0NjEwNH0.FROEm_O5C_KLQz6L0ZHCHMSY_AvttphI6_0V1nr6qTLc5YxXWPrCPFu02pDshJNWL91pE21OBv4eaMhd9dlzdg';
+
+    const validToken = 'validPrivyToken';
+    const privyId = 'testPrivyId';
+    const userId = 'testUserId';
 
     // Create a mock object that matches the AuthTokenClaims interface
     const claims: AuthTokenClaims = {
@@ -52,17 +56,32 @@ describe('AuthService', () => {
       issuedAt: Date.now(),
       expiration: Date.now() + 3600, // 1 hour later
       sessionId: 'testSessionId',
-      userId: 'testUserId',
+      userId: privyId,
+    };
+
+    const mockUser = {
+      id: userId,
+      privy_id: privyId,
+      created_at: new Date(),
+      updated_at: new Date(),
     };
 
     jest.spyOn(service['privy'], 'verifyAuthToken').mockResolvedValue(claims);
+    jest
+      .spyOn(service['userService'], 'getOrCreateUser')
+      .mockResolvedValue(mockUser);
+
     jest.spyOn(jwtService, 'sign').mockReturnValue('generatedJwt');
 
     const result = await service.validatePrivyToken(validToken);
     expect(result).toEqual({ accessToken: 'generatedJwt' });
+    expect(service['userService'].getOrCreateUser).toHaveBeenCalledWith(
+      privyId,
+    );
+    expect(jwtService.sign).toHaveBeenCalledWith({ userId: userId });
   });
 
-  it('should throw UnauthorizedException for an invalid Privy token', async () => {
+  it('should throw ForbiddenException for an invalid Privy token', async () => {
     const invalidToken = 'invalidToken';
 
     jest
@@ -70,7 +89,7 @@ describe('AuthService', () => {
       .mockRejectedValue(new Error('Invalid token'));
 
     await expect(service.validatePrivyToken(invalidToken)).rejects.toThrow(
-      UnauthorizedException,
+      ForbiddenException,
     );
   });
 
@@ -82,7 +101,7 @@ describe('AuthService', () => {
       .mockRejectedValue(new Error('Network error'));
 
     await expect(service.validatePrivyToken(errorToken)).rejects.toThrow(
-      UnauthorizedException,
+      ForbiddenException,
     );
   });
 });
