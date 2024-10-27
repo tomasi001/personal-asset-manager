@@ -1,19 +1,18 @@
-// src/auth/auth.controller.ts
-
 import {
-  Controller,
-  Post,
   Body,
+  Controller,
+  ForbiddenException,
+  Post,
   UnauthorizedException,
-  UseGuards,
 } from '@nestjs/common';
+import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { AuthGuard } from './auth.guard'; // Import AuthGuard
 
 /**
  * AuthController handles authentication-related requests.
  * It provides endpoints for user authentication and protected routes.
  */
+@ApiTags('auth')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -25,28 +24,35 @@ export class AuthController {
    * @throws UnauthorizedException if the token is invalid or not provided.
    */
   @Post()
+  @ApiOperation({ summary: 'Authenticate user with Privy token' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        privyToken: { type: 'string' },
+      },
+      required: ['privyToken'],
+    },
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Successfully authenticated',
+    schema: {
+      type: 'object',
+      properties: {
+        accessToken: { type: 'string' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Unauthorized - Invalid or missing Privy token',
+  })
   async authenticate(@Body('privyToken') privyToken: string) {
     if (!privyToken) {
       throw new UnauthorizedException('Privy token must be provided');
     }
 
-    try {
-      const result = await this.authService.validatePrivyToken(privyToken);
-      // Return the generated JWT
-      return { accessToken: result.accessToken };
-    } catch {
-      throw new UnauthorizedException('Invalid Privy token');
-    }
-  }
-
-  /**
-   * A protected route that can only be accessed by authenticated users.
-   * The AuthGuard is applied to this route to ensure that only requests with a valid JWT can access it.
-   * @returns A message indicating that the route is protected.
-   */
-  @UseGuards(AuthGuard) // Protect this route with the AuthGuard
-  @Post('protected')
-  async protectedRoute() {
-    return { message: 'This is a protected route' }; // Response for authenticated users
+    return this.authService.validatePrivyToken(privyToken);
   }
 }
