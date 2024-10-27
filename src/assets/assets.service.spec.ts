@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { AssetService } from './asset.service';
+import { AssetService } from './assets.service';
 import { DatabaseService } from '../database/database.service';
 
 describe('AssetService', () => {

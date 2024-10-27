@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { AssetController } from './asset.controller';
-import { AssetService } from './asset.service';
+import { AssetController } from './assets.controller';
+import { AssetService } from './assets.service';
 import { CreateAssetDto } from './dto/create-asset.dto';
 import { JwtService } from '@nestjs/jwt';
 
