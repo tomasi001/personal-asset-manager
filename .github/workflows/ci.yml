@@ -45,7 +45,7 @@ jobs:
 
       - name: Lockfile Verification
         run: |
-          git diff --exit-code package-lock.json || echo "Lockfile has changed!"
+          git diff --exit-code pnpm-lock.yaml || echo "Lockfile has changed!"
 
       - name: Run Linting
         run: |
