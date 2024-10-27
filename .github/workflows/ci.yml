@@ -33,6 +33,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-
 
+      - name: Cache node_modules
+        uses: actions/cache@v2
+        with:
+          path: '**/node_modules'
+          key: ${{ runner.os }}-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
+
       - name: Install Dependencies
         run: |
           pnpm install
@@ -43,7 +49,7 @@ jobs:
 
       - name: Run Linting
         run: |
-          pnpm run lint
+          pnpm run lint > lint_results.txt
 
       - name: Build Application
         run: |
@@ -51,4 +57,14 @@ jobs:
 
       - name: Run Tests
         run: |
-          pnpm run test
+          pnpm run test:cov
+
+      - name: Upload Results
+        uses: actions/upload-artifact@v2
+        with:
+          name: ci-results
+          path: |
+            lint_results.txt
+            coverage
+            dist
+          retention-days:
