@@ -3,6 +3,7 @@ import { AssetController } from './assets.controller';
 import { AssetService } from './assets.service';
 import { CreateAssetDto } from './dto/create-asset.dto';
 import { JwtService } from '@nestjs/jwt';
+import { ScheduleModule } from '@nestjs/schedule';
 
 describe('AssetController', () => {
   let controller: AssetController;
@@ -10,6 +11,7 @@ describe('AssetController', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
+      imports: [ScheduleModule.forRoot()],
       controllers: [AssetController],
       providers: [
         JwtService,
@@ -20,6 +22,8 @@ describe('AssetController', () => {
             findAll: jest.fn(),
             findOne: jest.fn(),
             remove: jest.fn(),
+            getAssetHistory: jest.fn(),
+            updateAssetPrices: jest.fn(),
           },
         },
       ],
@@ -131,6 +135,81 @@ describe('AssetController', () => {
       const result = await controller.remove(assetId, userId);
       expect(result).toBe(expectedResult);
       expect(assetService.remove).toHaveBeenCalledWith(assetId, userId);
+    });
+  });
+
+  describe('getAssetHistory', () => {
+    it('should return asset history', async () => {
+      const assetId = 'asset1';
+      const userId = 'user123';
+      const startDate = '2023-01-01';
+      const endDate = '2023-12-31';
+      const expectedResult = {
+        history: [
+          {
+            date: new Date('2023-01-01'),
+            price: 100,
+            value: 1000,
+            dailyPnl: 0,
+            cumulativePnl: 0,
+            cumulativePnlPercentage: 0,
+          },
+          {
+            date: new Date('2023-12-31'),
+            price: 150,
+            value: 1500,
+            dailyPnl: 500,
+            cumulativePnl: 500,
+            cumulativePnlPercentage: 50,
+          },
+        ],
+        quantity: 10,
+        overallPnl: 500,
+        overallPnlPercentage: 50,
+      };
+
+      jest
+        .spyOn(assetService, 'getAssetHistory')
+        .mockResolvedValue(expectedResult);
+
+      const result = await controller.getAssetHistory(
+        assetId,
+        userId,
+        startDate,
+        endDate,
+      );
+      expect(result).toBe(expectedResult);
+      expect(assetService.getAssetHistory).toHaveBeenCalledWith(
+        assetId,
+        userId,
+        new Date(startDate),
+        new Date(endDate),
+      );
+    });
+  });
+
+  describe('manualUpdatePrices', () => {
+    it('should update asset prices manually', async () => {
+      const expectedResult = { message: 'Asset prices updated successfully' };
+      jest
+        .spyOn(assetService, 'updateAssetPrices')
+        .mockResolvedValue(expectedResult);
+
+      const result = await controller.manualUpdatePrices();
+      expect(result).toEqual(expectedResult);
+      expect(assetService.updateAssetPrices).toHaveBeenCalled();
+    });
+  });
+
+  describe('handleDailyPriceUpdate', () => {
+    it('should update asset prices automatically', async () => {
+      const expectedResult = { message: 'Asset prices updated successfully' };
+      jest
+        .spyOn(assetService, 'updateAssetPrices')
+        .mockResolvedValue(expectedResult);
+
+      await controller.handleDailyPriceUpdate();
+      expect(assetService.updateAssetPrices).toHaveBeenCalled();
     });
   });
 });
