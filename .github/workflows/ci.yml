@@ -60,7 +60,7 @@ jobs:
           pnpm run test:cov
 
       - name: Upload Results
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: ci-results
           path: |
