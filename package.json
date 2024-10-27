@@ -18,7 +18,12 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "migrate": "ts-node ./src/database/migrations/migrate.ts"
+    "migrate": "ts-node ./src/database/migrations/migrate.ts",
+    "seed": "ts-node ./src/database/seed/seed.ts",
+    "clear-db": "ts-node ./src/database/seed/clear-tables.ts",
+    "seed-no-assets": "ts-node ./src/database/seed/seed-no-assets.ts",
+    "seed-losses": "ts-node ./src/database/seed/seed-portfolio-losses.ts",
+    "seed-mixed": "ts-node ./src/database/seed/seed-mixed-portfolio.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
@@ -28,6 +33,8 @@
     "@nestjs/mapped-types": "*",
     "@nestjs/passport": "^10.0.3",
     "@nestjs/platform-express": "^10.0.0",
+    "@nestjs/schedule": "^4.1.1",
+    "@nestjs/swagger": "^7.4.2",
     "@privy-io/server-auth": "^1.15.0",
     "@types/passport": "^1.0.16",
     "@types/passport-http": "^0.3.11",
@@ -42,6 +49,7 @@
     "pg": "^8.13.1",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1",
+    "swagger-ui-express": "^5.0.1",
     "token": "^0.1.0"
   },
   "devDependencies": {
