@@ -4,6 +4,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from './auth.service';
 import { AuthTokenClaims } from '@privy-io/server-auth';
 import { UnauthorizedException } from '@nestjs/common';
+import { UserService } from '../user/user.service';
+import { DatabaseService } from '../database/database.service';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -14,6 +16,8 @@ describe('AuthService', () => {
       providers: [
         AuthService,
         JwtService,
+        UserService,
+        DatabaseService,
         {
           provide: ConfigService,
           useValue: {
