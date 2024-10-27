@@ -5,9 +5,10 @@ import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DatabaseModule } from './database/database.module';
-import { AssetModule } from './asset/asset.module';
+import { AssetModule } from './assets/assets.module';
 import { UserModule } from './user/user.module';
 import { UserIdMiddleware } from './auth/user_id.middleware';
+import { PortfolioModule } from './portfolio/portfolio.module';
 
 @Module({
   imports: [
@@ -15,7 +16,8 @@ import { UserIdMiddleware } from './auth/user_id.middleware';
     ConfigModule.forRoot({ isGlobal: true }),
     DatabaseModule,
     AssetModule,
-    UserModule, // Load .env variables globally
+    UserModule,
+    PortfolioModule,
   ],
   controllers: [AppController],
   providers: [AppService],
