@@ -3,6 +3,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrivyClient, AuthTokenClaims } from '@privy-io/server-auth';
+import { UserService } from 'src/user/user.service';
 
 /**
  * AuthService is responsible for handling authentication-related tasks.
@@ -22,6 +23,7 @@ export class AuthService {
   constructor(
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly userService: UserService,
   ) {
     const appId = this.configService.get<string>('PRIVY_APP_ID');
     const appSecret = this.configService.get<string>('PRIVY_APP_SECRET');
@@ -43,13 +45,12 @@ export class AuthService {
       const claims: AuthTokenClaims =
         await this.privy.verifyAuthToken(privyToken);
 
-      const userId = claims.userId;
+      const privyId = claims.userId;
 
-      // Create a new user profile if the user does not exist.
-      // For now, we'll assume the user exists or is created successfully.
+      const user = await this.userService.getOrCreateUser(privyId);
 
       // Generate our own JWT using the user ID from the claims.
-      const ourToken = this.jwtService.sign({ userId });
+      const ourToken = this.jwtService.sign({ userId: user.id });
 
       // Return the generated access token.
       return { accessToken: ourToken };
