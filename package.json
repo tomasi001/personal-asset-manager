@@ -95,7 +95,9 @@
     "coveragePathIgnorePatterns": [
       "node_modules",
       ".module.ts",
-      "main.ts"
+      "main.ts",
+      "database/seed",
+      "entities"
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
