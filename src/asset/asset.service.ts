@@ -1,8 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { CreateAssetDto } from './dto/create-asset.dto';
-import { UpdateAssetDto } from './dto/update-asset.dto';
+import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { NewAsset, NewUserAsset } from '../database/types';
+import { CreateAssetDto } from './dto/create-asset.dto';
 
 @Injectable()
 export class AssetService {
@@ -82,41 +81,5 @@ export class AssetService {
     }
 
     return { message: 'Asset removed successfully' };
-  }
-
-  async update(id: string, updateAssetDto: UpdateAssetDto, userId: string) {
-    const db = this.databaseService.getDb();
-
-    // First, check if the asset belongs to the user
-    const userAsset = await db
-      .selectFrom('user_assets')
-      .where('asset_id', '=', id)
-      .where('user_id', '=', userId)
-      .executeTakeFirst();
-
-    if (!userAsset) {
-      throw new NotFoundException(
-        'Asset not found or does not belong to the user',
-      );
-    }
-
-    // Update the asset
-    await db
-      .updateTable('assets')
-      .set(updateAssetDto)
-      .where('id', '=', id)
-      .execute();
-
-    // If quantity is provided, update the user_assets table
-    if (updateAssetDto.quantity !== undefined) {
-      await db
-        .updateTable('user_assets')
-        .set({ quantity: updateAssetDto.quantity })
-        .where('asset_id', '=', id)
-        .where('user_id', '=', userId)
-        .execute();
-    }
-
-    return { message: 'Asset updated successfully' };
   }
 }
