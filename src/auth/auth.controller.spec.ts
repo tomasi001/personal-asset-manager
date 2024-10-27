@@ -59,4 +59,9 @@ describe('AuthController', () => {
       UnauthorizedException,
     );
   });
+
+  it('should return a message for the protected route', async () => {
+    const result = await controller.protectedRoute();
+    expect(result).toEqual({ message: 'This is a protected route' });
+  });
 });
