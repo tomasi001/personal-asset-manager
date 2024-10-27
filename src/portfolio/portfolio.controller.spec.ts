@@ -2,6 +2,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PortfolioController } from './portfolio.controller';
 import { PortfolioService } from './portfolio.service';
+import { ConfigService } from '@nestjs/config';
 
 describe('PortfolioController', () => {
   let controller: PortfolioController;
@@ -11,6 +12,7 @@ describe('PortfolioController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [PortfolioController],
       providers: [
+        ConfigService,
         JwtService,
         {
           provide: PortfolioService,

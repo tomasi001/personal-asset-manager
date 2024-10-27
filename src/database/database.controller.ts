@@ -7,13 +7,17 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { AuthGuard } from '../auth/auth.guard';
+import { ConfigService } from '@nestjs/config';
 
 @ApiTags('database')
 @ApiBearerAuth('JWT-auth')
 @Controller('database')
 @UseGuards(AuthGuard)
 export class DatabaseController {
-  constructor(private readonly dbService: DatabaseService) {}
+  constructor(
+    private readonly dbService: DatabaseService,
+    private readonly configService: ConfigService,
+  ) {}
 
   @Get('status')
   @ApiOperation({ summary: 'Check database connection status' })

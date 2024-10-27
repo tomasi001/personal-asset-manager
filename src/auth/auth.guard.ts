@@ -7,6 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 
 /**
  * AuthGuard is a custom guard that implements the CanActivate interface.
@@ -14,7 +15,10 @@ import { JwtService } from '@nestjs/jwt';
  */
 @Injectable()
 export class AuthGuard implements CanActivate {
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+  ) {}
 
   /**
    * The canActivate method is called to determine if a request should be allowed to proceed.
@@ -34,13 +38,20 @@ export class AuthGuard implements CanActivate {
     }
 
     try {
+      console.log('Attempting to verify token...');
+      const jwtSecret = this.configService.get<string>('JWT_SECRET');
+
       // Verify the token using the JwtService
-      const payload = this.jwtService.verify(token);
+      const payload = this.jwtService.verify(token, { secret: jwtSecret });
+      console.log('Verified payload:', payload);
 
       // Attach the user information (payload) to the request object for later use
       request.user = payload; // This allows access to user info in the route handler
       return true; // Allow the request to proceed
-    } catch {
+    } catch (error: any) {
+      console.error('Token verification failed:', error.message);
+      console.error('Error details:', error);
+
       // If token verification fails, throw an UnauthorizedException
       throw new UnauthorizedException('Invalid token');
     }

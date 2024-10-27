@@ -4,6 +4,7 @@ import { AssetService } from './assets.service';
 import { CreateAssetDto } from './dto/create-asset.dto';
 import { JwtService } from '@nestjs/jwt';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ConfigService } from '@nestjs/config';
 
 describe('AssetController', () => {
   let controller: AssetController;
@@ -14,6 +15,7 @@ describe('AssetController', () => {
       imports: [ScheduleModule.forRoot()],
       controllers: [AssetController],
       providers: [
+        ConfigService,
         JwtService,
         {
           provide: AssetService,

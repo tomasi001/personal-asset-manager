@@ -2,6 +2,7 @@ import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthGuard } from './auth.guard';
+import { ConfigService } from '@nestjs/config';
 
 describe('AuthGuard', () => {
   let guard: AuthGuard;
@@ -11,6 +12,7 @@ describe('AuthGuard', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthGuard,
+        ConfigService,
         {
           provide: JwtService,
           useValue: {
