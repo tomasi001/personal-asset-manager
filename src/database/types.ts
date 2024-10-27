@@ -16,11 +16,10 @@ export interface Database {
 
 // Define the UserTable interface
 export interface UserTable {
-  id: Generated<string>; // UUID Primary Key
-  email: string; // User email (Unique)
-  privy_id: string; // Privy.io identifier (Unique)
-  created_at: ColumnType<Date, string | undefined, never>; // Timestamp of user creation
-  updated_at: ColumnType<Date, string | undefined, never>; // Timestamp of last update
+  id: Generated<string>;
+  privy_id: string;
+  created_at: ColumnType<Date, string | undefined, never>;
+  updated_at: ColumnType<Date, string | undefined, never>;
 }
 
 // Define the AssetTable interface
