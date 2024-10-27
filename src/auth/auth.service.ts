@@ -3,7 +3,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrivyClient, AuthTokenClaims } from '@privy-io/server-auth';
-import { UserService } from 'src/user/user.service';
+import { UserService } from '../user/user.service';
 
 /**
  * AuthService is responsible for handling authentication-related tasks.
