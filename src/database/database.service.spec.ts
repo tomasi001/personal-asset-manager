@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { Kysely } from 'kysely';
 import { DatabaseService } from './database.service';
 import { getKyselyInstance } from './kysely.config';
-import { Kysely } from 'kysely';
 import { Database } from './types';
 
 jest.mock('./kysely.config'); // Mock the Kysely config module

@@ -6,7 +6,6 @@ import { PortfolioService } from './portfolio.service';
 describe('PortfolioService', () => {
   let portfolioService: PortfolioService;
   let assetService: AssetService;
-  // let databaseService: DatabaseService;
 
   const mockDb = {
     selectFrom: jest.fn().mockReturnThis(),
@@ -34,7 +33,6 @@ describe('PortfolioService', () => {
 
     portfolioService = module.get<PortfolioService>(PortfolioService);
     assetService = module.get<AssetService>(AssetService);
-    // databaseService = module.get<DatabaseService>(DatabaseService);
   });
 
   it('should be defined', () => {

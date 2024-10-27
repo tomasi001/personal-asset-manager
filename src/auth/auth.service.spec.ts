@@ -1,11 +1,11 @@
+import { ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
-import { AuthService } from './auth.service';
 import { AuthTokenClaims } from '@privy-io/server-auth';
-import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
-import { UserService } from '../user/user.service';
 import { DatabaseService } from '../database/database.service';
+import { UserService } from '../user/user.service';
+import { AuthService } from './auth.service';
 
 describe('AuthService', () => {
   let service: AuthService;

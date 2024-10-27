@@ -1,8 +1,8 @@
+import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DatabaseController } from './database.controller';
-import { DatabaseService } from './database.service';
 import { DatabaseModule } from './database.module';
-import { JwtService } from '@nestjs/jwt';
+import { DatabaseService } from './database.service';
 
 describe('DatabaseController', () => {
   let controller: DatabaseController;

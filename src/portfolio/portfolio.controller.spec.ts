@@ -1,7 +1,7 @@
+import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PortfolioController } from './portfolio.controller';
 import { PortfolioService } from './portfolio.service';
-import { JwtService } from '@nestjs/jwt';
 
 describe('PortfolioController', () => {
   let controller: PortfolioController;
