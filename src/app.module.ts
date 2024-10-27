@@ -1,14 +1,12 @@
 // src/app.module.ts
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
-import { AuthModule } from './auth/auth.module';
 import { ConfigModule } from '@nestjs/config';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
-import { DatabaseModule } from './database/database.module';
 import { AssetModule } from './assets/assets.module';
-import { UserModule } from './user/user.module';
+import { AuthModule } from './auth/auth.module';
 import { UserIdMiddleware } from './auth/user_id.middleware';
+import { DatabaseModule } from './database/database.module';
 import { PortfolioModule } from './portfolio/portfolio.module';
+import { UserModule } from './user/user.module';
 
 @Module({
   imports: [
@@ -19,8 +17,6 @@ import { PortfolioModule } from './portfolio/portfolio.module';
     UserModule,
     PortfolioModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
