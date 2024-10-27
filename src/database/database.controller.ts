@@ -1,12 +1,38 @@
-// src/database/database.controller.ts
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, UseGuards } from '@nestjs/common';
 import { DatabaseService } from './database.service';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
+import { AuthGuard } from '../auth/auth.guard';
 
+@ApiTags('database')
+@ApiBearerAuth('JWT-auth')
 @Controller('database')
+@UseGuards(AuthGuard)
 export class DatabaseController {
   constructor(private readonly dbService: DatabaseService) {}
 
   @Get('status')
+  @ApiOperation({ summary: 'Check database connection status' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns the status of the database connection',
+    schema: {
+      type: 'string',
+      example: 'Database connection is healthy!',
+    },
+  })
+  @ApiResponse({
+    status: 500,
+    description: 'Internal server error',
+    schema: {
+      type: 'string',
+      example: 'Database connection failed!',
+    },
+  })
   async getStatus(): Promise<string> {
     try {
       await this.dbService
