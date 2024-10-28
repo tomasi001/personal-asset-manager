@@ -1,5 +1,7 @@
-import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+import { createParamDecorator, ExecutionContext, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { getErrorMessage } from '../utils';
 
 /**
  * UserId Decorator
@@ -29,35 +31,51 @@ import { JwtService } from '@nestjs/jwt';
  * conjunction with guards or other authentication mechanisms.
  */
 export const UserId = createParamDecorator(
-  (data: unknown, ctx: ExecutionContext) => {
+  async (data: unknown, ctx: ExecutionContext): Promise<string | null> => {
+    const logger = new Logger('UserIdDecorator');
+    const configService = new ConfigService();
+    const jwtService = new JwtService({
+      secret: configService.get<string>('JWT_SECRET'),
+    });
+
     // Get the request object from the execution context
     const request = ctx.switchToHttp().getRequest();
 
+    const authHeader = request.headers.authorization;
+    if (!authHeader) {
+      logger.debug('No authorization header found');
+      return null;
+    }
+
     // Extract the token from the Authorization header
     // The header format is expected to be: "Bearer <token>"
-    const token = request.headers.authorization?.split(' ')[1];
+    const [bearer, token] = authHeader.split(' ');
+    if (bearer !== 'Bearer' || !token) {
+      logger.debug('Invalid authorization header format');
+      return null;
+    }
 
     if (token) {
       try {
-        // Create a new instance of JwtService
-        // Note: In a real-world scenario, it's better to inject JwtService instead of creating a new instance
-        const jwtService = new JwtService({ secret: process.env.JWT_SECRET });
-
         // Verify and decode the token
-        const decoded = jwtService.verify(token);
+        const decoded = await jwtService.verifyAsync(token);
 
         // Return the userId from the decoded token
-        return decoded.userId;
-      } catch {
+        if (typeof decoded === 'object' && 'userId' in decoded) {
+          return decoded.userId as string;
+        }
+      } catch (error) {
         // Token verification failed
         // We don't throw an error here because:
         // 1. The decorator's role is to extract info, not to enforce authentication
         // 2. We want to let the AuthGuard or similar mechanism handle authentication failures
         // 3. Returning null allows the calling code to handle the absence of a valid userId
+        logger.warn(`Failed to verify token:  ${getErrorMessage(error)}`);
       }
     }
 
     // Return null if no token was found or if verification failed
+    logger.warn('JWT payload does not contain userId');
     return null;
   },
 );
