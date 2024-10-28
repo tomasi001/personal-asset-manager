@@ -2,6 +2,7 @@
 /dist
 /node_modules
 /build
+SETUP_LOG.md
 
 # Logs
 logs

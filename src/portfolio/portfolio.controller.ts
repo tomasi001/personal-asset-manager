@@ -9,13 +9,28 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 
+/**
+ * @class PortfolioController
+ * @description Controller responsible for handling portfolio-related operations
+ */
 @ApiTags('Portfolio')
 @ApiBearerAuth('JWT-auth')
 @Controller('portfolio')
 @UseGuards(AuthGuard)
 export class PortfolioController {
+  /**
+   * @constructor
+   * @param {PortfolioService} portfolioService - The portfolio service instance
+   */
   constructor(private readonly portfolioService: PortfolioService) {}
 
+  /**
+   * @method getPortfolioValueAndPnL
+   * @description Retrieves the portfolio value and Profit and Loss (PnL) for the authenticated user
+   * @param {string} userId - The ID of the authenticated user
+   * @returns {Promise<any>} The portfolio value and PnL data
+   * @throws {UnauthorizedException} If the user is not authenticated
+   */
   @Get()
   @ApiOperation({ summary: 'Get portfolio value and PnL' })
   @ApiResponse({

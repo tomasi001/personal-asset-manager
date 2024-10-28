@@ -25,6 +25,10 @@ import {
 } from '@nestjs/swagger';
 import { Asset } from './entities/asset.entity';
 
+/**
+ * Controller for managing user assets.
+ * @class
+ */
 @ApiTags('assets')
 @ApiBearerAuth('JWT-auth')
 @Controller('assets')
@@ -32,6 +36,12 @@ import { Asset } from './entities/asset.entity';
 export class AssetController {
   constructor(private readonly assetService: AssetService) {}
 
+  /**
+   * Creates a new asset in the user's portfolio.
+   * @param {CreateAssetDto} createAssetDto - The data for creating a new asset.
+   * @param {string} userId - The ID of the user.
+   * @returns {Promise<Asset>} The created asset.
+   */
   @Post()
   @ApiOperation({ summary: 'Add an asset to user portfolio' })
   @ApiResponse({
@@ -42,6 +52,11 @@ export class AssetController {
     return this.assetService.create(createAssetDto, userId);
   }
 
+  /**
+   * Retrieves all assets in the user's portfolio.
+   * @param {string} userId - The ID of the user.
+   * @returns {Promise<Asset[]>} An array of assets in the user's portfolio.
+   */
   @Get()
   @ApiOperation({ summary: 'Get all assets in user portfolio' })
   @ApiResponse({
@@ -53,6 +68,12 @@ export class AssetController {
     return this.assetService.findAll(userId);
   }
 
+  /**
+   * Retrieves a specific asset from the user's portfolio.
+   * @param {string} userAssetId - The ID of the user-asset.
+   * @param {string} userId - The ID of the user.
+   * @returns {Promise<Asset>} The requested asset.
+   */
   @Get(':userAssetId')
   @ApiOperation({ summary: 'Get a specific asset from user portfolio' })
   @ApiParam({ name: 'userAssetId', description: 'Asset ID' })
@@ -69,6 +90,12 @@ export class AssetController {
     return this.assetService.findOne(userAssetId, userId);
   }
 
+  /**
+   * Removes a specific asset entry from the user's portfolio.
+   * @param {string} userAssetId - The ID of the user-asset to remove.
+   * @param {string} userId - The ID of the user.
+   * @returns {Promise<void>}
+   */
   @Delete(':userAssetId')
   @ApiOperation({
     summary: 'Remove a specific asset entry from user portfolio',
@@ -87,6 +114,14 @@ export class AssetController {
     return this.assetService.remove(userAssetId, userId);
   }
 
+  /**
+   * Retrieves the price history for a specific asset.
+   * @param {string} userAssetId - The ID of the user-asset.
+   * @param {string} userId - The ID of the user.
+   * @param {string} [startDate] - The start date for the history (YYYY-MM-DD).
+   * @param {string} [endDate] - The end date for the history (YYYY-MM-DD).
+   * @returns {Promise<any>} The asset price history.
+   */
   @Get(':userAssetId/history')
   @ApiOperation({ summary: 'Get asset price history' })
   @ApiParam({ name: 'userAssetId', description: 'Asset ID' })
@@ -116,6 +151,11 @@ export class AssetController {
     );
   }
 
+  /**
+   * Manually updates asset prices.
+   * @returns {Promise<{ message: string }>} A success message.
+   * @throws {HttpException} If there's an error updating asset prices.
+   */
   @Post('update-prices')
   @ApiOperation({ summary: 'Manually update asset prices' })
   @ApiResponse({
@@ -157,12 +197,21 @@ export class AssetController {
     }
   }
 
+  /**
+   * Automatically updates asset prices daily at midnight.
+   * @returns {Promise<void>}
+   */
   @Cron('0 0 * * *') // Run at midnight every day
   @ApiOperation({ summary: 'Automatically update asset prices daily' })
   async handleDailyPriceUpdate() {
     await this.updatePrices();
   }
 
+  /**
+   * Private method to update asset prices.
+   * @private
+   * @returns {Promise<void>}
+   */
   private async updatePrices() {
     await this.assetService.updateAssetPrices();
   }

@@ -23,9 +23,9 @@ export class AssetService {
    * Validates that token_id is provided for ERC-721 tokens and not for ERC-20 tokens.
    * ERC-721 tokens are unique and require a token ID, while ERC-20 tokens are fungible and don't.
    *
-   * @param assetType - The type of the asset (ERC-20 or ERC-721)
-   * @param tokenId - The token ID of the asset (if applicable)
-   * @throws Error if the validation fails
+   * @param {('ERC-20' | 'ERC-721')} assetType - The type of the asset
+   * @param {string} [tokenId] - The token ID of the asset (if applicable)
+   * @throws {Error} If the validation fails
    */
   private validateTokenId(
     assetType: 'ERC-20' | 'ERC-721',
@@ -44,9 +44,10 @@ export class AssetService {
    * If the asset already exists in the global asset list, it's added to the user's portfolio.
    * If it doesn't exist, it's first created in the global asset list, then added to the user's portfolio.
    *
-   * @param createAssetDto - Data Transfer Object containing the asset details
-   * @param userId - ID of the user adding the asset
-   * @returns An object containing a success message and the ID of the added asset
+   * @param {CreateAssetDto} createAssetDto - Data Transfer Object containing the asset details
+   * @param {string} userId - ID of the user adding the asset
+   * @returns {Promise<{ message: string, assetId: string }>} An object containing a success message and the ID of the added asset
+   * @throws {HttpException} If there's an error during the creation process
    */
   async create(createAssetDto: CreateAssetDto, userId: string) {
     try {
@@ -123,8 +124,8 @@ export class AssetService {
   /**
    * Retrieves all assets in a user's portfolio.
    *
-   * @param userId - ID of the user whose assets are being retrieved
-   * @returns An array of assets with their details, quantities, and relevant IDs
+   * @param {string} userId - ID of the user whose assets are being retrieved
+   * @returns {Promise<Array<{ userAssetId: string, assetId: string, name: string, asset_type: string, description: string, contract_address: string, chain: string, token_id: string | null, created_at: Date, quantity: number | null }>>} An array of assets with their details, quantities, and relevant IDs
    */
   async findAll(userId: string) {
     const db = this.databaseService.getDb();
@@ -150,10 +151,10 @@ export class AssetService {
   /**
    * Retrieves a specific asset from a user's portfolio.
    *
-   * @param userAssetId - ID of the user-asset entry to retrieve
-   * @param userId - ID of the user who owns the asset
-   * @returns The asset details if found
-   * @throws NotFoundException if the asset is not found in the user's portfolio
+   * @param {string} userAssetId - ID of the user-asset entry to retrieve
+   * @param {string} userId - ID of the user who owns the asset
+   * @returns {Promise<{ userAssetId: string, assetId: string, name: string, asset_type: string, description: string, contract_address: string, chain: string, token_id: string | null, created_at: Date, quantity: number | null }>} The asset details if found
+   * @throws {NotFoundException} If the asset is not found in the user's portfolio
    */
   async findOne(userAssetId: string, userId: string) {
     const db = this.databaseService.getDb();
@@ -184,14 +185,13 @@ export class AssetService {
 
     return result;
   }
-
   /**
    * Removes a specific asset entry from a user's portfolio.
    *
-   * @param userAssetId - ID of the user-asset entry to remove
-   * @param userId - ID of the user who owns the asset
-   * @returns An object containing a success message
-   * @throws NotFoundException if the user-asset entry is not found
+   * @param {string} userAssetId - ID of the user-asset entry to remove
+   * @param {string} userId - ID of the user who owns the asset
+   * @returns {Promise<{ message: string }>} An object containing a success message
+   * @throws {NotFoundException} If the user-asset entry is not found
    */
   async remove(userAssetId: string, userId: string) {
     const db = this.databaseService.getDb();
@@ -214,11 +214,26 @@ export class AssetService {
 
   /**
    * Retrieves the price history and calculates performance metrics for a specific user asset.
-   * @param userAssetId - ID of the user asset entry
-   * @param userId - ID of the user who owns the asset
-   * @param startDate - Optional start date for the history range
-   * @param endDate - Optional end date for the history range
-   * @returns An object containing the price history and performance metrics
+   *
+   * @param {string} userAssetId - ID of the user asset entry
+   * @param {string} userId - ID of the user who owns the asset
+   * @param {Date} [startDate] - Optional start date for the history range
+   * @param {Date} [endDate] - Optional end date for the history range
+   * @returns {Promise<{
+   *   history: Array<{
+   *     date: Date,
+   *     price: number,
+   *     value: number,
+   *     dailyPnl: number,
+   *     cumulativePnl: number,
+   *     cumulativePnlPercentage: number
+   *   }>,
+   *   quantity: number | null,
+   *   overallPnl: number,
+   *   overallPnlPercentage: number
+   * }>} An object containing the price history and performance metrics
+   * @throws {NotFoundException} If the user asset is not found
+   * @throws {Error} If the ERC-20 asset has an invalid quantity
    */
   async getAssetHistory(
     userAssetId: string,
@@ -322,7 +337,8 @@ export class AssetService {
    * Updates the prices of all assets in the system.
    * This method simulates price changes for demonstration purposes.
    * In a real-world scenario, you would fetch actual prices from external APIs.
-   * @returns An object containing a success message
+   *
+   * @returns {Promise<{ message: string }>} An object containing a success message
    */
   async updateAssetPrices() {
     const db = this.databaseService.getDb();
