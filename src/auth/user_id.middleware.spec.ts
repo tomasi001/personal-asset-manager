@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { UserIdMiddleware } from './user_id.middleware';
 import { Request, Response } from 'express';
+import { ConfigService } from '@nestjs/config';
 
 describe('UserIdMiddleware', () => {
   let middleware: UserIdMiddleware;
@@ -11,6 +12,7 @@ describe('UserIdMiddleware', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UserIdMiddleware,
+        ConfigService,
         {
           provide: JwtService,
           useValue: {

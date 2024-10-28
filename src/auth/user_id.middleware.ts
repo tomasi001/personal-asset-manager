@@ -1,6 +1,8 @@
-import { Injectable, NestMiddleware } from '@nestjs/common';
+import { Injectable, Logger, NestMiddleware } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+import { getErrorMessage } from '../utils';
 
 /**
  * UserIdMiddleware
@@ -26,27 +28,45 @@ import { JwtService } from '@nestjs/jwt';
  */
 @Injectable()
 export class UserIdMiddleware implements NestMiddleware {
-  constructor(private readonly jwtService: JwtService) {}
+  private readonly logger = new Logger(UserIdMiddleware.name);
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+  ) {}
 
-  use(req: Request, res: Response, next: NextFunction) {
+  use(req: Request, res: Response, next: NextFunction): void {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return next();
+    }
     // Extract the token from the Authorization header
     // The header format is expected to be: "Bearer <token>"
-    const token = req.headers.authorization?.split(' ')[1];
+    const [bearer, token] = authHeader.split(' ');
+    if (bearer !== 'Bearer' || !token) {
+      return next();
+    }
 
     if (token) {
       try {
         // Attempt to verify and decode the token
-        const decoded = this.jwtService.verify(token);
+        const decoded = this.jwtService.verify(token, {
+          secret: this.configService.get<string>('JWT_SECRET'),
+        });
 
         // If successful, attach the userId to the request object
         // This makes the userId available to subsequent request handlers
-        req['userId'] = decoded.userId;
-      } catch {
+        if (typeof decoded === 'object' && 'userId' in decoded) {
+          req['userId'] = decoded.userId;
+        } else {
+          this.logger.warn('JWT payload does not contain userId');
+        }
+      } catch (error) {
         // Token verification failed
         // We don't throw an error here because:
         // 1. The request might be for a public route that doesn't require authentication
         // 2. We want to let the AuthGuard or similar mechanism handle authentication failures
         // 3. This middleware's primary purpose is to extract info, not to enforce auth
+        this.logger.warn(`Failed to verify token: ${getErrorMessage(error)}`);
       }
     }
 
