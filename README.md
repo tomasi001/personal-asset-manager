@@ -61,6 +61,9 @@ This process is super easy and quick, allowing you to quickly obtain your Privy 
    ```bash
    set -o allexport; source .env; set +o allexport
    docker compose up -d
+   ```
+
+   ```bash
    pnpm run migrate
    ```
 
