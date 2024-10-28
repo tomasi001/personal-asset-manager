@@ -12,11 +12,16 @@ describe('AuthGuard', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthGuard,
-        ConfigService,
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn().mockReturnValue('test_secret'),
+          },
+        },
         {
           provide: JwtService,
           useValue: {
-            verify: jest.fn(),
+            verifyAsync: jest.fn(), // Change this line
           },
         },
       ],
@@ -24,6 +29,7 @@ describe('AuthGuard', () => {
 
     guard = module.get<AuthGuard>(AuthGuard);
     jwtService = module.get<JwtService>(JwtService);
+    module.get<ConfigService>(ConfigService);
   });
 
   it('should be defined', () => {
@@ -43,13 +49,13 @@ describe('AuthGuard', () => {
       } as unknown as jest.Mocked<ExecutionContext>;
     });
 
-    it('should throw UnauthorizedException if no token is provided', () => {
-      expect(() => guard.canActivate(mockExecutionContext)).toThrow(
+    it('should throw UnauthorizedException if no token is provided', async () => {
+      await expect(guard.canActivate(mockExecutionContext)).rejects.toThrow(
         UnauthorizedException,
       );
     });
 
-    it('should return true for a valid token', () => {
+    it('should return true for a valid token', async () => {
       const mockRequest = {
         headers: { authorization: 'Bearer validtoken' },
         user: {},
@@ -57,24 +63,28 @@ describe('AuthGuard', () => {
       (
         mockExecutionContext.switchToHttp().getRequest as jest.Mock
       ).mockReturnValue(mockRequest);
-      (jwtService.verify as jest.Mock).mockReturnValue({ userId: '123' });
+      (jwtService.verifyAsync as jest.Mock).mockResolvedValue({
+        // Change this line
+        userId: '123',
+      });
 
-      expect(guard.canActivate(mockExecutionContext)).toBe(true);
+      await expect(guard.canActivate(mockExecutionContext)).resolves.toBe(true);
       expect(mockRequest.user).toEqual({ userId: '123' });
     });
 
-    it('should throw UnauthorizedException for an invalid token', () => {
+    it('should throw UnauthorizedException for an invalid token', async () => {
       const mockRequest = {
         headers: { authorization: 'Bearer invalidtoken' },
       };
       (
         mockExecutionContext.switchToHttp().getRequest as jest.Mock
       ).mockReturnValue(mockRequest);
-      (jwtService.verify as jest.Mock).mockImplementation(() => {
-        throw new Error('Invalid token');
-      });
+      (jwtService.verifyAsync as jest.Mock).mockRejectedValue(
+        // Change this line
+        new Error('Invalid token'),
+      );
 
-      expect(() => guard.canActivate(mockExecutionContext)).toThrow(
+      await expect(guard.canActivate(mockExecutionContext)).rejects.toThrow(
         UnauthorizedException,
       );
     });
