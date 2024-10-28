@@ -1,6 +1,14 @@
-import { Body, Controller, Post, UnauthorizedException } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Post,
+  UnauthorizedException,
+  ValidationPipe,
+} from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
+import { PrivyTokenDto } from './dto/privy-token.dto';
+import { AuthResponseDto } from './dto/auth-response.dto';
 
 /**
  * AuthController handles authentication-related requests.
@@ -19,30 +27,21 @@ export class AuthController {
    */
   @Post()
   @ApiOperation({ summary: 'Authenticate user with Privy token' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        privyToken: { type: 'string' },
-      },
-      required: ['privyToken'],
-    },
-  })
+  @ApiBody({ type: PrivyTokenDto })
   @ApiResponse({
     status: 201,
     description: 'Successfully authenticated',
-    schema: {
-      type: 'object',
-      properties: {
-        accessToken: { type: 'string' },
-      },
-    },
+    type: AuthResponseDto,
   })
   @ApiResponse({
     status: 403,
     description: 'Unauthorized - Invalid or missing Privy token',
   })
-  async authenticate(@Body('privyToken') privyToken: string) {
+  async authenticate(
+    @Body(ValidationPipe) privyTokenDto: PrivyTokenDto,
+  ): Promise<AuthResponseDto> {
+    const { privyToken } = privyTokenDto;
+
     if (!privyToken) {
       throw new UnauthorizedException('Privy token must be provided');
     }

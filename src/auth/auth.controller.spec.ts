@@ -1,8 +1,9 @@
-import { UnauthorizedException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
+import { UnauthorizedException, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { PrivyTokenDto } from './dto/privy-token.dto';
+import { AuthResponseDto } from './dto/auth-response.dto';
 
 describe('AuthController', () => {
   let controller: AuthController;
@@ -15,12 +16,14 @@ describe('AuthController', () => {
         {
           provide: AuthService,
           useValue: {
-            validatePrivyToken: jest.fn(), // Mock the validatePrivyToken method
+            validatePrivyToken: jest.fn(),
           },
         },
-        JwtService, // Include JwtService if needed for AuthGuard
       ],
-    }).compile();
+    })
+      .overrideProvider(ValidationPipe)
+      .useValue(new ValidationPipe({ transform: true, whitelist: true }))
+      .compile();
 
     controller = module.get<AuthController>(AuthController);
     authService = module.get<AuthService>(AuthService);
@@ -31,31 +34,31 @@ describe('AuthController', () => {
   });
 
   it('should authenticate a user with a valid Privy token', async () => {
-    const validToken = 'validPrivyToken';
+    const validTokenDto: PrivyTokenDto = { privyToken: 'validPrivyToken' };
     const mockAccessToken = 'mockAccessToken';
 
-    // Mock the AuthService's validatePrivyToken method
     jest
       .spyOn(authService, 'validatePrivyToken')
-      .mockResolvedValue({ accessToken: mockAccessToken });
+      .mockResolvedValue(new AuthResponseDto(mockAccessToken));
 
-    const result = await controller.authenticate(validToken);
-    expect(result).toEqual({ accessToken: mockAccessToken });
+    const result = await controller.authenticate(validTokenDto);
+    expect(result).toEqual(new AuthResponseDto(mockAccessToken));
   });
 
   it('should throw UnauthorizedException if no Privy token is provided', async () => {
-    await expect(controller.authenticate(undefined)).rejects.toThrow(
+    const emptyTokenDto: PrivyTokenDto = { privyToken: '' };
+    await expect(controller.authenticate(emptyTokenDto)).rejects.toThrow(
       UnauthorizedException,
     );
   });
 
   it('should throw UnauthorizedException for an invalid Privy token', async () => {
-    const invalidToken = 'invalidPrivyToken';
+    const invalidTokenDto: PrivyTokenDto = { privyToken: 'invalidPrivyToken' };
     jest
       .spyOn(authService, 'validatePrivyToken')
       .mockRejectedValue(new UnauthorizedException('Invalid Privy token'));
 
-    await expect(controller.authenticate(invalidToken)).rejects.toThrow(
+    await expect(controller.authenticate(invalidTokenDto)).rejects.toThrow(
       UnauthorizedException,
     );
   });
