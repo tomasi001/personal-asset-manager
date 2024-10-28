@@ -1,99 +1,173 @@
+# Personal Asset Manager
+
 <p align="center">
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
 </p>
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
-
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
-
 ## Description
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+Personal Asset Manager is a NestJS-based application that allows users to securely manage their digital assets. It provides features for asset tracking, portfolio management, and user authentication using Privy.io.
 
-## Project setup
+## Features
+
+- User authentication via Privy.io
+- Asset management (ERC-20 and ERC-721 tokens)
+- Portfolio valuation and performance tracking
+- Historical asset value and PnL analysis
+- Mock daily price updates for assets
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed:
+
+- Node.js (v21)
+- pnpm (v9)
+- Docker
+- Docker Compose (usually included with Docker Desktop for Windows and Mac, but may need separate installation on Linux)
+- A Privy.io account and [Privy Access Token Retriever App](https://github.com/tomasi001/get-privy-access-token)
+
+The test app is a simple React app that displays your Privy token. To use it:
+
+1. Clone the repository
+2. Install dependencies
+3. Add your Privy App ID to the .env
+4. Run the app
+5. Login
+
+This process is super easy and quick, allowing you to quickly obtain your Privy token for testing purposes.
+
+## Project Setup
+
+1. Clone the repository:
+
+   ```bash
+   git clone https://github.com/tomasi001/personal-asset-manager.git
+   cd personal-asset-manager
+   ```
+
+2. Install dependencies:
+
+   ```bash
+   pnpm install
+   ```
+
+3. Set up environment variables:
+
+   - Rename `.example.env` to `.env` in the root directory
+   - Update the variables, including your Privy.io app ID and private key
+
+4. Set up the database:
+
+   ```bash
+   set -o allexport; source .env; set +o allexport
+   docker compose up -d
+   pnpm run migrate
+   ```
+
+## Running the Application
+
+1. Start the development server:
+
+   ```bash
+   pnpm run start:dev
+   ```
+
+2. The application will be available at `http://localhost:3000`
+
+## API Documentation
+
+Swagger UI is available for API documentation. After starting the application, visit:
+
+`http://localhost:3000/api`
+
+To authenticate:
+
+1. Open the auth dropdown
+2. Click "Try it out"
+3. Paste your Privy access token into the request body
+4. Click "Execute"
+5. Copy the access token from the response
+6. Scroll to the top of the Swagger UI page and click "Authorize"
+7. Enter the JWT access token
+8. Click "Authorize"
+
+You are now authorized to use any of the API endpoints.
+
+## Testing
+
+1. Run unit tests:
+
+   ```bash
+   pnpm run test
+   ```
+
+2. Run e2e tests:
+
+   ```bash
+   pnpm run test:e2e
+   ```
+
+3. Generate test coverage report:
+   ```bash
+   pnpm run test:cov
+   ```
+
+## Database Seeding
+
+To quickly test the application with sample data:
+
+1. View `src/db/seed` for various seeding utility scripts
+2. Seed your database with users, assets, user_assets, and asset_daily_prices
+3. Use the clear table script to reset the database
+
+Available seeding scripts:
 
 ```bash
-$ pnpm install
+pnpm run seed
+pnpm run seed-no-assets
+pnpm run seed-losses
+pnpm run seed-mixed
+pnpm run clear-db
 ```
 
-## Compile and run the project
+**Important Note on Privy ID in DB Seed Scripts:**
 
-```bash
-# development
-$ pnpm run start
+- Log in to Privy to obtain your access token
+- Use the token to authenticate through the Swagger API
+- After first authentication, your Privy ID will be stored in the database
+- Use this Privy ID in your seed scripts for consistent user simulation
 
-# watch mode
-$ pnpm run start:dev
+## Authentication Architecture
 
-# production mode
-$ pnpm run start:prod
-```
+<p align="center">
+  <img src="./auth-architecture.png" alt="Authentication Architecture" width="700">
+</p>
 
-## Run tests
+This diagram illustrates the complete authentication flow in our Personal Asset Manager application:
 
-```bash
-# unit tests
-$ pnpm run test
+1. The client initiates authentication with Privy.
+2. Privy returns a JWT to the client.
+3. The client sends this Privy JWT to our backend's /auth endpoint.
+4. Our backend verifies the Privy JWT with Privy's authentication service.
+5. If the JWT is valid:
+   - The backend checks if the user exists in our database.
+   - If the user doesn't exist, a new user is created.
+   - Our backend generates its own JWT.
+   - This JWT is returned to the client for future requests.
+6. If the Privy JWT is invalid, a 403 Forbidden response is sent to the client.
+7. For all subsequent requests, the client uses our JWT to access protected resources.
+8. The backend validates our JWT and provides access to protected resources.
 
-# e2e tests
-$ pnpm run test:e2e
+This flow ensures secure authentication using Privy while maintaining our
+own user management system and securing all subsequent API calls.
 
-# test coverage
-$ pnpm run test:cov
-```
+## CI/CD
 
-## Deployment
+This project uses GitHub Actions for CI/CD. The pipeline includes:
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+- Dependency installation
+- Linting
+- Building the application
+- Running tests (if implemented)
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ pnpm install -g mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+The pipeline runs on every pull request to ensure code quality and consistency.
