@@ -10,6 +10,7 @@ import { JwtService } from '@nestjs/jwt';
 import { AuthTokenClaims, PrivyClient } from '@privy-io/server-auth';
 import { UserService } from '../user/user.service';
 import { getErrorMessage } from '../utils';
+import { JwtPayload } from './interfaces/jwt.interface';
 
 /**
  * AuthService is responsible for handling authentication-related tasks.
@@ -56,7 +57,7 @@ export class AuthService {
 
       const user = await this.userService.getOrCreateUser(privyId);
 
-      const payload = {
+      const payload: JwtPayload = {
         userId: user.id,
         sub: user.id,
         privyId: privyId,

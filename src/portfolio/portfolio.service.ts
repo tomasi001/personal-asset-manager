@@ -3,6 +3,8 @@ import { DatabaseService } from '../database/database.service';
 import { AssetService } from '../assets/assets.service';
 import { PortfolioValueAndPnL } from './interfaces/portfolio-value-and-pnl.interface';
 import { MergedUserAsset } from '../assets/interfaces/asset-interfaces';
+import { Database } from '../database/types';
+import { Kysely } from 'kysely';
 
 /**
  * PortfolioService is responsible for managing and calculating portfolio-related data.
@@ -62,7 +64,7 @@ export class PortfolioService {
   }
 
   private async calculateAssetValue(
-    db: any,
+    db: Kysely<Database>,
     asset: MergedUserAsset,
   ): Promise<{ value: number; cost: number }> {
     const [latestPrice, initialPrice] = await Promise.all([
@@ -81,7 +83,7 @@ export class PortfolioService {
     };
   }
 
-  private async getLatestAssetPrice(db: any, assetId: string) {
+  private async getLatestAssetPrice(db: Kysely<Database>, assetId: string) {
     return db
       .selectFrom('asset_daily_prices')
       .where('asset_id', '=', assetId)
@@ -91,7 +93,7 @@ export class PortfolioService {
       .executeTakeFirst();
   }
 
-  private async getInitialAssetPrice(db: any, assetId: string) {
+  private async getInitialAssetPrice(db: Kysely<Database>, assetId: string) {
     return db
       .selectFrom('asset_daily_prices')
       .where('asset_id', '=', assetId)

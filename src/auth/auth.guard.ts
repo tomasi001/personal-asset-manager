@@ -7,6 +7,8 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { getErrorMessage } from '../utils';
+import { JwtPayload } from './interfaces/jwt.interface';
 
 /**
  * AuthGuard is a custom guard that implements the CanActivate interface.
@@ -45,29 +47,44 @@ export class AuthGuard implements CanActivate {
       // Attach the user information (payload) to the request object for later use
       request['user'] = payload; // This allows access to user info in the route handler
       return true; // Allow the request to proceed
-    } catch (error: any) {
-      console.error('Token verification failed:', error.message);
-      console.error('Error details:', error);
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      console.error('Token verification failed:', errorMessage);
 
       // If token verification fails, throw an UnauthorizedException
       throw new UnauthorizedException('Invalid token');
     }
   }
 
-  private getRequest(context: ExecutionContext): Request {
-    return context.switchToHttp().getRequest<Request>();
+  private extractTokenFromHeader(request: unknown): string | undefined {
+    if (request && typeof request === 'object' && 'headers' in request) {
+      const headers = request.headers;
+      if (
+        headers &&
+        typeof headers === 'object' &&
+        'authorization' in headers
+      ) {
+        const authHeader = headers.authorization;
+        if (typeof authHeader === 'string') {
+          const [type, token] = authHeader.split(' ');
+          return type === 'Bearer' ? token : undefined;
+        }
+      }
+    }
+    return undefined;
   }
 
-  private extractTokenFromHeader(request: any): string | undefined {
-    const [type, token] = request.headers?.authorization?.split(' ') ?? [];
-    return type === 'Bearer' ? token : undefined;
-  }
-
-  private async verifyToken(token: string): Promise<any> {
+  private async verifyToken(token: string): Promise<JwtPayload> {
     const jwtSecret = this.configService.get<string>('JWT_SECRET');
     if (!jwtSecret) {
       throw new Error('JWT_SECRET is not configured');
     }
-    return this.jwtService.verifyAsync(token, { secret: jwtSecret });
+    try {
+      return await this.jwtService.verifyAsync<JwtPayload>(token, { secret: jwtSecret });
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      console.error('Token verification failed:', errorMessage);
+      throw new UnauthorizedException('Invalid token');
+    }
   }
 }
