@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -42,9 +42,6 @@ describe('AuthService', () => {
   // Additional tests can be added here...
 
   it('should validate a valid Privy token and return a JWT', async () => {
-    // const validToken =
-    // 'eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InBMYnFOODM3aXVMdGlBalNFWkhlN3JPUkxZRS1kMDcwY0lIeDl6bUx4dzAifQ.eyJzaWQiOiJjbTJxMzNubm0wMGpsMTN0cDI3eGY5cm81IiwiaXNzIjoicHJpdnkuaW8iLCJpYXQiOjE3Mjk5NDI1MDQsImF1ZCI6ImNtMnEwNDdzZzBnNnExMGpzcnhhZzBncXMiLCJzdWIiOiJkaWQ6cHJpdnk6Y20ycTEwMXF1MDI0NWJkZDhvaTc2cmFzdCIsImV4cCI6MTcyOTk0NjEwNH0.FROEm_O5C_KLQz6L0ZHCHMSY_AvttphI6_0V1nr6qTLc5YxXWPrCPFu02pDshJNWL91pE21OBv4eaMhd9dlzdg';
-
     const validToken = 'validPrivyToken';
     const privyId = 'testPrivyId';
     const userId = 'testUserId';
@@ -78,10 +75,20 @@ describe('AuthService', () => {
     expect(service['userService'].getOrCreateUser).toHaveBeenCalledWith(
       privyId,
     );
-    expect(jwtService.sign).toHaveBeenCalledWith({ userId: userId });
+    expect(jwtService.sign).toHaveBeenCalledWith(
+      {
+        userId: userId,
+        sub: userId,
+        privyId: privyId,
+        iat: expect.any(Number),
+      },
+      {
+        expiresIn: expect.any(String),
+      },
+    );
   });
 
-  it('should throw ForbiddenException for an invalid Privy token', async () => {
+  it('should throw UnauthorizedException for an invalid Privy token', async () => {
     const invalidToken = 'invalidToken';
 
     jest
@@ -89,6 +96,18 @@ describe('AuthService', () => {
       .mockRejectedValue(new Error('Invalid token'));
 
     await expect(service.validatePrivyToken(invalidToken)).rejects.toThrow(
+      UnauthorizedException,
+    );
+  });
+
+  it('should rethrow ForbiddenException', async () => {
+    const forbiddenToken = 'forbiddenToken';
+
+    jest
+      .spyOn(service['privy'], 'verifyAuthToken')
+      .mockRejectedValue(new ForbiddenException('Forbidden'));
+
+    await expect(service.validatePrivyToken(forbiddenToken)).rejects.toThrow(
       ForbiddenException,
     );
   });
@@ -101,7 +120,7 @@ describe('AuthService', () => {
       .mockRejectedValue(new Error('Network error'));
 
     await expect(service.validatePrivyToken(errorToken)).rejects.toThrow(
-      ForbiddenException,
+      UnauthorizedException,
     );
   });
 });

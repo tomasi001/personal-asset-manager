@@ -1,9 +1,15 @@
 // src/auth/auth.service.ts
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { AuthTokenClaims, PrivyClient } from '@privy-io/server-auth';
 import { UserService } from '../user/user.service';
+import { getErrorMessage } from '../utils';
 
 /**
  * AuthService is responsible for handling authentication-related tasks.
@@ -12,6 +18,7 @@ import { UserService } from '../user/user.service';
 @Injectable()
 export class AuthService {
   private readonly privy: PrivyClient;
+  private readonly logger = new Logger(AuthService.name);
 
   /**
    * Constructor for AuthService.
@@ -49,14 +56,29 @@ export class AuthService {
 
       const user = await this.userService.getOrCreateUser(privyId);
 
-      // Generate our own JWT using the user ID from the claims.
-      const ourToken = this.jwtService.sign({ userId: user.id });
+      const payload = {
+        userId: user.id,
+        sub: user.id,
+        privyId: privyId,
+        iat: Math.floor(Date.now() / 1000),
+      };
 
+      // Generate our own JWT using the user ID from the claims.
+      const accessToken = this.jwtService.sign(payload, {
+        expiresIn: this.configService.get<string>('JWT_EXPIRATION') || '1h',
+      });
+
+      this.logger.debug(`JWT generated for user ${user.id}`);
       // Return the generated access token.
-      return { accessToken: ourToken };
-    } catch {
-      // Handle invalid Privy token by throwing an UnauthorizedException.
-      throw new ForbiddenException('Invalid or expired Privy token');
+      return { accessToken };
+    } catch (error) {
+      this.logger.error(
+        `Failed to validate Privy token: ${getErrorMessage(error)}`,
+      );
+      if (error instanceof ForbiddenException) {
+        throw error;
+      }
+      throw new UnauthorizedException('Invalid or expired Privy token');
     }
   }
 }
