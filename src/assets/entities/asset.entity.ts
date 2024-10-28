@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { AssetType } from '../enums/ asset-type.enum';
 
 export class Asset {
   @ApiProperty({ description: 'The unique identifier of the asset' })
@@ -9,9 +10,9 @@ export class Asset {
 
   @ApiProperty({
     description: 'The type of the asset',
-    enum: ['ERC-20', 'ERC-721'],
+    enum: AssetType,
   })
-  asset_type: 'ERC-20' | 'ERC-721';
+  asset_type: AssetType;
 
   @ApiProperty({ description: 'A description of the asset', required: false })
   description?: string;

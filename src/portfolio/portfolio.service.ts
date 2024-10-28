@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { AssetService } from '../assets/assets.service';
 import { PortfolioValueAndPnL } from './interfaces/portfolio-value-and-pnl.interface';
-import { MergedUserAsset } from './interfaces/merged-user-asset.interface';
+import { MergedUserAsset } from '../assets/interfaces/asset-interfaces';
 
 /**
  * PortfolioService is responsible for managing and calculating portfolio-related data.
@@ -66,12 +66,12 @@ export class PortfolioService {
     asset: MergedUserAsset,
   ): Promise<{ value: number; cost: number }> {
     const [latestPrice, initialPrice] = await Promise.all([
-      this.getLatestAssetPrice(db, asset.assetId),
-      this.getInitialAssetPrice(db, asset.assetId),
+      this.getLatestAssetPrice(db, asset.asset_id),
+      this.getInitialAssetPrice(db, asset.asset_id),
     ]);
 
     if (!latestPrice || !initialPrice) {
-      this.logger.warn(`Missing price data for asset ${asset.assetId}`);
+      this.logger.warn(`Missing price data for asset ${asset.asset_id}`);
       return { value: 0, cost: 0 };
     }
 

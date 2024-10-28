@@ -10,24 +10,27 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { AuthGuard } from '../auth/auth.guard';
 import { UserId } from '../auth/user_id.decorator';
 import { AssetService } from './assets.service';
 import { CreateAssetDto } from './dto/create-asset.dto';
-import { Cron } from '@nestjs/schedule';
 import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiParam,
-  ApiQuery,
-} from '@nestjs/swagger';
-import { Asset } from './entities/asset.entity';
+  AssetHistoryResponse,
+  MergedUserAssetResponse,
+} from './responses/asset-responses';
 
 /**
- * Controller for managing user assets.
- * @class
+ * Controller for managing user assets and asset-related operations.
+ * Handles CRUD operations for assets, retrieves asset history, and manages asset price updates.
  */
 @ApiTags('assets')
 @ApiBearerAuth('JWT-auth')
@@ -40,7 +43,7 @@ export class AssetController {
    * Creates a new asset in the user's portfolio.
    * @param {CreateAssetDto} createAssetDto - The data for creating a new asset.
    * @param {string} userId - The ID of the user.
-   * @returns {Promise<Asset>} The created asset.
+   * @returns {Promise<{ message: string; assetId: string }>} The result of the asset creation.
    */
   @Post()
   @ApiOperation({ summary: 'Add an asset to user portfolio' })
@@ -48,21 +51,24 @@ export class AssetController {
     status: 201,
     description: 'The asset has been successfully added to the user portfolio.',
   })
-  create(@Body() createAssetDto: CreateAssetDto, @UserId() userId: string) {
+  create(
+    @Body() createAssetDto: CreateAssetDto,
+    @UserId() userId: string,
+  ): Promise<{ message: string; assetId: string }> {
     return this.assetService.create(createAssetDto, userId);
   }
 
   /**
    * Retrieves all assets in the user's portfolio.
    * @param {string} userId - The ID of the user.
-   * @returns {Promise<Asset[]>} An array of assets in the user's portfolio.
+   * @returns {Promise<MergedUserAssetResponse[]>} An array of assets in the user's portfolio.
    */
   @Get()
   @ApiOperation({ summary: 'Get all assets in user portfolio' })
   @ApiResponse({
     status: 200,
     description: 'Return all assets in the user portfolio.',
-    type: [Asset],
+    type: [MergedUserAssetResponse],
   })
   findAll(@UserId() userId: string) {
     return this.assetService.findAll(userId);
@@ -70,9 +76,9 @@ export class AssetController {
 
   /**
    * Retrieves a specific asset from the user's portfolio.
-   * @param {string} userAssetId - The ID of the user-asset.
+   * @param {string} userAssetId - The ID of the user-asset entry.
    * @param {string} userId - The ID of the user.
-   * @returns {Promise<Asset>} The requested asset.
+   * @returns {Promise<MergedUserAssetResponse>} The requested asset.
    */
   @Get(':userAssetId')
   @ApiOperation({ summary: 'Get a specific asset from user portfolio' })
@@ -80,7 +86,7 @@ export class AssetController {
   @ApiResponse({
     status: 200,
     description: 'Return the asset from user portfolio.',
-    type: Asset,
+    type: MergedUserAssetResponse,
   })
   @ApiResponse({
     status: 404,
@@ -92,9 +98,9 @@ export class AssetController {
 
   /**
    * Removes a specific asset entry from the user's portfolio.
-   * @param {string} userAssetId - The ID of the user-asset to remove.
+   * @param {string} userAssetId - The ID of the user-asset entry to remove.
    * @param {string} userId - The ID of the user.
-   * @returns {Promise<void>}
+   * @returns {Promise<{ message: string }>} A success message.
    */
   @Delete(':userAssetId')
   @ApiOperation({
@@ -115,12 +121,12 @@ export class AssetController {
   }
 
   /**
-   * Retrieves the price history for a specific asset.
-   * @param {string} userAssetId - The ID of the user-asset.
+   * Retrieves the price history and performance metrics for a specific asset.
+   * @param {string} userAssetId - The ID of the user-asset entry.
    * @param {string} userId - The ID of the user.
    * @param {string} [startDate] - The start date for the history (YYYY-MM-DD).
    * @param {string} [endDate] - The end date for the history (YYYY-MM-DD).
-   * @returns {Promise<any>} The asset price history.
+   * @returns {Promise<AssetHistoryResponse>} The asset price history and performance metrics.
    */
   @Get(':userAssetId/history')
   @ApiOperation({ summary: 'Get asset price history' })
@@ -135,7 +141,11 @@ export class AssetController {
     required: false,
     description: 'End date for history (YYYY-MM-DD)',
   })
-  @ApiResponse({ status: 200, description: 'Return the asset price history.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Return the asset price history.',
+    type: AssetHistoryResponse,
+  })
   @ApiResponse({ status: 404, description: 'Asset not found.' })
   getAssetHistory(
     @Param('userAssetId') userAssetId: string,
@@ -199,7 +209,6 @@ export class AssetController {
 
   /**
    * Automatically updates asset prices daily at midnight.
-   * @returns {Promise<void>}
    */
   @Cron('0 0 * * *') // Run at midnight every day
   @ApiOperation({ summary: 'Automatically update asset prices daily' })
@@ -210,7 +219,6 @@ export class AssetController {
   /**
    * Private method to update asset prices.
    * @private
-   * @returns {Promise<void>}
    */
   private async updatePrices() {
     await this.assetService.updateAssetPrices();

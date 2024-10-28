@@ -2,26 +2,13 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AssetService } from './assets.service';
 import { DatabaseService } from '../database/database.service';
 import { CreateAssetDto } from './dto/create-asset.dto';
-import { HttpException, NotFoundException } from '@nestjs/common';
+import { AssetType } from './enums/ asset-type.enum';
+import { HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
+import { MergedUserAsset } from './interfaces/asset-interfaces';
 
 describe('AssetService', () => {
   let service: AssetService;
-  // let databaseService: DatabaseService;
-
-  const mockDb = {
-    selectFrom: jest.fn().mockReturnThis(),
-    innerJoin: jest.fn().mockReturnThis(),
-    where: jest.fn().mockReturnThis(),
-    select: jest.fn().mockReturnThis(),
-    selectAll: jest.fn().mockReturnThis(),
-    orderBy: jest.fn().mockReturnThis(),
-    limit: jest.fn().mockReturnThis(),
-    execute: jest.fn(),
-    executeTakeFirst: jest.fn(),
-    insertInto: jest.fn().mockReturnThis(),
-    values: jest.fn().mockReturnThis(),
-    returning: jest.fn().mockReturnThis(),
-  };
+  let databaseService: DatabaseService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -29,13 +16,23 @@ describe('AssetService', () => {
         AssetService,
         {
           provide: DatabaseService,
-          useValue: { getDb: jest.fn().mockReturnValue(mockDb) },
+          useValue: {
+            getDb: jest.fn().mockReturnValue({
+              transaction: jest.fn().mockReturnValue({
+                execute: jest.fn(),
+              }),
+              insertInto: jest.fn().mockReturnValue({
+                values: jest.fn().mockReturnThis(),
+                execute: jest.fn(),
+              }),
+            }),
+          },
         },
       ],
     }).compile();
 
     service = module.get<AssetService>(AssetService);
-    // databaseService = module.get<DatabaseService>(DatabaseService);
+    databaseService = module.get<DatabaseService>(DatabaseService);
   });
 
   it('should be defined', () => {
@@ -46,171 +43,452 @@ describe('AssetService', () => {
     it('should create a new asset and add it to user portfolio', async () => {
       const createAssetDto: CreateAssetDto = {
         name: 'Test Asset',
-        asset_type: 'ERC-20',
+        asset_type: AssetType.ERC20,
+        description: 'Test Description',
         contract_address: '0x1234567890123456789012345678901234567890',
-        chain: 'Ethereum',
+        chain: 'ethereum',
         quantity: 100,
       };
       const userId = 'user123';
 
-      // Mock the asset check
-      mockDb.executeTakeFirst.mockResolvedValueOnce(null);
+      const mockExecute = jest.fn().mockResolvedValue({
+        id: 'asset123',
+        name: createAssetDto.name,
+        asset_type: createAssetDto.asset_type,
+        description: createAssetDto.description,
+        contract_address: createAssetDto.contract_address,
+        chain: createAssetDto.chain,
+        created_at: new Date(),
+      });
 
-      // Mock the asset creation
-      mockDb.execute.mockResolvedValueOnce([{ id: 'asset1' }]);
-
-      // Mock the user asset creation
-      mockDb.execute.mockResolvedValueOnce([{ id: 'userAsset1' }]);
+      jest
+        .spyOn(databaseService.getDb().transaction(), 'execute')
+        .mockImplementation(mockExecute);
 
       const result = await service.create(createAssetDto, userId);
 
       expect(result).toEqual({
         message: 'Asset added to user portfolio successfully',
-        assetId: 'asset1',
+        assetId: 'asset123',
       });
-
-      // Verify that the database methods were called correctly
-      expect(mockDb.selectFrom).toHaveBeenCalledWith('assets');
-      expect(mockDb.where).toHaveBeenCalledWith(
-        'contract_address',
-        '=',
-        createAssetDto.contract_address,
-      );
-      expect(mockDb.where).toHaveBeenCalledWith(
-        'chain',
-        '=',
-        createAssetDto.chain,
-      );
-      expect(mockDb.where).toHaveBeenCalledWith(
-        'asset_type',
-        '=',
-        createAssetDto.asset_type,
-      );
-      expect(mockDb.selectAll).toHaveBeenCalled();
-      expect(mockDb.executeTakeFirst).toHaveBeenCalled();
-
-      expect(mockDb.insertInto).toHaveBeenCalledWith('assets');
-      expect(mockDb.values).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: createAssetDto.name,
-          asset_type: createAssetDto.asset_type,
-          contract_address: createAssetDto.contract_address,
-          chain: createAssetDto.chain,
-        }),
-      );
-
-      expect(mockDb.insertInto).toHaveBeenCalledWith('user_assets');
-      expect(mockDb.values).toHaveBeenCalledWith(
-        expect.objectContaining({
-          user_id: userId,
-          asset_id: 'asset1',
-          quantity: createAssetDto.quantity,
-        }),
+      expect(mockExecute).toHaveBeenCalled();
+      expect(databaseService.getDb().insertInto).toHaveBeenCalledWith(
+        'user_assets',
       );
     });
 
-    it('should throw HttpException if an error occurs', async () => {
+    it('should throw HttpException if token_id is provided for ERC20 asset', async () => {
       const createAssetDto: CreateAssetDto = {
         name: 'Test Asset',
-        asset_type: 'ERC-20',
+        asset_type: AssetType.ERC20,
+        description: 'Test Description',
         contract_address: '0x1234567890123456789012345678901234567890',
-        chain: 'Ethereum',
+        chain: 'ethereum',
         quantity: 100,
+        token_id: '1', // This should cause an error for ERC20
       };
       const userId = 'user123';
 
-      // Mock an error
-      mockDb.executeTakeFirst.mockRejectedValueOnce(
-        new Error('Database error'),
-      );
-
       await expect(service.create(createAssetDto, userId)).rejects.toThrow(
-        HttpException,
+        new HttpException(
+          'Token ID should not be provided for ERC-20 assets',
+          HttpStatus.BAD_REQUEST,
+        ),
       );
     });
   });
 
   describe('findAll', () => {
-    it('should return all assets for a user', async () => {
+    it('should return all assets for a given user', async () => {
       const userId = 'user123';
-      const mockAssets = [
-        { userAssetId: 'ua1', assetId: 'a1', name: 'Asset 1' },
-        { userAssetId: 'ua2', assetId: 'a2', name: 'Asset 2' },
+      const mockAssets: MergedUserAsset[] = [
+        {
+          id: 'userAsset1',
+          user_id: userId,
+          asset_id: 'asset1',
+          quantity: 100,
+          created_at: new Date(),
+          name: 'Test Asset 1',
+          asset_type: AssetType.ERC20,
+          description: 'Test Description 1',
+          contract_address: '0x1234567890123456789012345678901234567890',
+          chain: 'ethereum',
+          token_id: null,
+          asset_created_at: new Date(),
+        },
+        {
+          id: 'userAsset2',
+          user_id: userId,
+          asset_id: 'asset2',
+          quantity: null,
+          created_at: new Date(),
+          name: 'Test Asset 2',
+          asset_type: AssetType.ERC721,
+          description: 'Test Description 2',
+          contract_address: '0x0987654321098765432109876543210987654321',
+          chain: 'ethereum',
+          token_id: '1',
+          asset_created_at: new Date(),
+        },
       ];
 
-      mockDb.execute.mockResolvedValueOnce(mockAssets);
+      const mockSelectFrom = jest.fn().mockReturnThis();
+      const mockInnerJoin = jest.fn().mockReturnThis();
+      const mockWhere = jest.fn().mockReturnThis();
+      const mockSelect = jest.fn().mockReturnThis();
+      const mockExecute = jest.fn().mockResolvedValue(mockAssets);
+
+      jest.spyOn(databaseService, 'getDb').mockReturnValue({
+        selectFrom: mockSelectFrom,
+        innerJoin: mockInnerJoin,
+        where: mockWhere,
+        select: mockSelect,
+        execute: mockExecute,
+      } as any);
 
       const result = await service.findAll(userId);
 
       expect(result).toEqual(mockAssets);
+      expect(mockSelectFrom).toHaveBeenCalledWith('user_assets');
+      expect(mockInnerJoin).toHaveBeenCalledWith(
+        'assets',
+        'assets.id',
+        'user_assets.asset_id',
+      );
+      expect(mockWhere).toHaveBeenCalledWith(
+        'user_assets.user_id',
+        '=',
+        userId,
+      );
+      expect(mockSelect).toHaveBeenCalledWith([
+        'user_assets.id',
+        'user_assets.user_id',
+        'user_assets.asset_id',
+        'user_assets.quantity',
+        'user_assets.created_at',
+        'assets.name',
+        'assets.asset_type',
+        'assets.description',
+        'assets.contract_address',
+        'assets.chain',
+        'assets.token_id',
+        'assets.created_at as asset_created_at',
+      ]);
+      expect(mockExecute).toHaveBeenCalled();
+    });
+
+    it('should return an empty array if user has no assets', async () => {
+      const userId = 'userWithNoAssets';
+
+      jest.spyOn(databaseService, 'getDb').mockReturnValue({
+        selectFrom: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue([]),
+      } as any);
+
+      const result = await service.findAll(userId);
+
+      expect(result).toEqual([]);
     });
   });
 
   describe('findOne', () => {
-    it('should return a specific asset for a user', async () => {
-      const userAssetId = 'ua1';
+    it('should return a specific asset for a given user', async () => {
+      const userAssetId = 'userAsset1';
       const userId = 'user123';
-      const mockAsset = { userAssetId: 'ua1', assetId: 'a1', name: 'Asset 1' };
+      const mockAsset: MergedUserAsset = {
+        id: userAssetId,
+        user_id: userId,
+        asset_id: 'asset1',
+        quantity: 100,
+        created_at: new Date(),
+        name: 'Test Asset 1',
+        asset_type: AssetType.ERC20,
+        description: 'Test Description 1',
+        contract_address: '0x1234567890123456789012345678901234567890',
+        chain: 'ethereum',
+        token_id: null,
+        asset_created_at: new Date(),
+      };
 
-      mockDb.executeTakeFirst.mockResolvedValueOnce(mockAsset);
+      const mockSelectFrom = jest.fn().mockReturnThis();
+      const mockInnerJoin = jest.fn().mockReturnThis();
+      const mockWhere = jest.fn().mockReturnThis();
+      const mockSelect = jest.fn().mockReturnThis();
+      const mockExecuteTakeFirst = jest.fn().mockResolvedValue(mockAsset);
+
+      jest.spyOn(databaseService, 'getDb').mockReturnValue({
+        selectFrom: mockSelectFrom,
+        innerJoin: mockInnerJoin,
+        where: mockWhere,
+        select: mockSelect,
+        executeTakeFirst: mockExecuteTakeFirst,
+      } as any);
 
       const result = await service.findOne(userAssetId, userId);
 
       expect(result).toEqual(mockAsset);
+      expect(mockSelectFrom).toHaveBeenCalledWith('user_assets');
+      expect(mockInnerJoin).toHaveBeenCalledWith(
+        'assets',
+        'assets.id',
+        'user_assets.asset_id',
+      );
+      expect(mockWhere).toHaveBeenCalledWith(
+        'user_assets.id',
+        '=',
+        userAssetId,
+      );
+      expect(mockWhere).toHaveBeenCalledWith(
+        'user_assets.user_id',
+        '=',
+        userId,
+      );
+      expect(mockSelect).toHaveBeenCalledWith([
+        'user_assets.id',
+        'user_assets.user_id',
+        'user_assets.asset_id',
+        'user_assets.quantity',
+        'user_assets.created_at',
+        'assets.name',
+        'assets.asset_type',
+        'assets.description',
+        'assets.contract_address',
+        'assets.chain',
+        'assets.token_id',
+        'assets.created_at as asset_created_at',
+      ]);
+      expect(mockExecuteTakeFirst).toHaveBeenCalled();
     });
 
     it('should throw NotFoundException if asset is not found', async () => {
-      const userAssetId = 'ua1';
+      const userAssetId = 'nonExistentAsset';
       const userId = 'user123';
 
-      mockDb.executeTakeFirst.mockResolvedValueOnce(null);
+      jest.spyOn(databaseService, 'getDb').mockReturnValue({
+        selectFrom: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        executeTakeFirst: jest.fn().mockResolvedValue(null),
+      } as any);
 
       await expect(service.findOne(userAssetId, userId)).rejects.toThrow(
-        NotFoundException,
+        new NotFoundException(
+          `Asset with ID ${userAssetId} not found in user's portfolio`,
+        ),
+      );
+    });
+  });
+
+  describe('remove', () => {
+    it('should remove a specific asset from user portfolio', async () => {
+      const userAssetId = 'userAsset1';
+      const userId = 'user123';
+
+      const mockDeleteFrom = jest.fn().mockReturnThis();
+      const mockWhere = jest.fn().mockReturnThis();
+      const mockExecuteTakeFirst = jest
+        .fn()
+        .mockResolvedValue({ numDeletedRows: 1n });
+
+      jest.spyOn(databaseService, 'getDb').mockReturnValue({
+        deleteFrom: mockDeleteFrom,
+        where: mockWhere,
+        executeTakeFirst: mockExecuteTakeFirst,
+      } as any);
+
+      const result = await service.remove(userAssetId, userId);
+
+      expect(result).toEqual({
+        message: 'Asset removed from user portfolio successfully',
+      });
+      expect(mockDeleteFrom).toHaveBeenCalledWith('user_assets');
+      expect(mockWhere).toHaveBeenCalledWith('id', '=', userAssetId);
+      expect(mockWhere).toHaveBeenCalledWith('user_id', '=', userId);
+      expect(mockExecuteTakeFirst).toHaveBeenCalled();
+    });
+
+    it('should throw NotFoundException if user-asset entry is not found', async () => {
+      const userAssetId = 'nonExistentAsset';
+      const userId = 'user123';
+
+      jest.spyOn(databaseService, 'getDb').mockReturnValue({
+        deleteFrom: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        executeTakeFirst: jest.fn().mockResolvedValue({ numDeletedRows: 0n }),
+      } as any);
+
+      await expect(service.remove(userAssetId, userId)).rejects.toThrow(
+        new NotFoundException('User-asset entry not found in the portfolio'),
+      );
+    });
+
+    it('should throw NotFoundException if delete operation returns null', async () => {
+      const userAssetId = 'userAsset1';
+      const userId = 'user123';
+
+      jest.spyOn(databaseService, 'getDb').mockReturnValue({
+        deleteFrom: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        executeTakeFirst: jest.fn().mockResolvedValue(null),
+      } as any);
+
+      await expect(service.remove(userAssetId, userId)).rejects.toThrow(
+        new NotFoundException('User-asset entry not found in the portfolio'),
       );
     });
   });
 
   describe('getAssetHistory', () => {
-    it('should return asset history and performance metrics', async () => {
-      const userAssetId = 'ua1';
-      const userId = 'user123';
-      const mockUserAsset = {
-        assetId: 'a1',
-        asset_type: 'ERC-20',
-        quantity: 100,
-      };
+    const userAssetId = 'userAsset1';
+    const userId = 'user123';
+    const mockUserAsset: MergedUserAsset = {
+      id: userAssetId,
+      user_id: userId,
+      asset_id: 'asset1',
+      quantity: 100,
+      created_at: new Date(),
+      name: 'Test Asset',
+      asset_type: AssetType.ERC20,
+      description: 'Test Description',
+      contract_address: '0x1234567890123456789012345678901234567890',
+      chain: 'ethereum',
+      token_id: null,
+      asset_created_at: new Date(),
+    };
+
+    beforeEach(() => {
+      jest.spyOn(service, 'findOne').mockResolvedValue(mockUserAsset);
+      jest
+        .spyOn(service as any, 'validateUserAsset')
+        .mockImplementation(() => {});
+    });
+
+    it('should return asset history with metrics', async () => {
       const mockPriceHistory = [
         { price: 100, recorded_at: new Date('2023-01-01') },
         { price: 110, recorded_at: new Date('2023-01-02') },
+        { price: 105, recorded_at: new Date('2023-01-03') },
       ];
 
       jest
-        .spyOn(service, 'findOne')
-        .mockResolvedValueOnce(mockUserAsset as any);
-      mockDb.execute.mockResolvedValueOnce(mockPriceHistory);
+        .spyOn(service as any, 'fetchPriceHistory')
+        .mockResolvedValue(mockPriceHistory);
+      jest.spyOn(service as any, 'calculateHistoryMetrics').mockReturnValue([
+        {
+          date: '2023-01-01',
+          price: '100.000000',
+          value: 10000,
+          dailyPnl: 0,
+          cumulativePnl: 0,
+          cumulativePnlPercentage: 0,
+        },
+        {
+          date: '2023-01-02',
+          price: '110.000000',
+          value: 11000,
+          dailyPnl: 1000,
+          cumulativePnl: 1000,
+          cumulativePnlPercentage: 10,
+        },
+        {
+          date: '2023-01-03',
+          price: '105.000000',
+          value: 10500,
+          dailyPnl: -500,
+          cumulativePnl: 500,
+          cumulativePnlPercentage: 5,
+        },
+      ]);
+      jest.spyOn(service as any, 'calculateOverallMetrics').mockReturnValue({
+        overallPnl: 500,
+        overallPnlPercentage: 5,
+      });
+      jest
+        .spyOn(service as any, 'formatQuantity')
+        .mockReturnValue('100.000000');
 
       const result = await service.getAssetHistory(userAssetId, userId);
 
-      expect(result).toHaveProperty('history');
-      expect(result).toHaveProperty('quantity', 100);
-      expect(result).toHaveProperty('overallPnl');
-      expect(result).toHaveProperty('overallPnlPercentage');
+      expect(result).toEqual({
+        history: [
+          {
+            date: '2023-01-01',
+            price: '100.000000',
+            value: 10000,
+            dailyPnl: 0,
+            cumulativePnl: 0,
+            cumulativePnlPercentage: 0,
+          },
+          {
+            date: '2023-01-02',
+            price: '110.000000',
+            value: 11000,
+            dailyPnl: 1000,
+            cumulativePnl: 1000,
+            cumulativePnlPercentage: 10,
+          },
+          {
+            date: '2023-01-03',
+            price: '105.000000',
+            value: 10500,
+            dailyPnl: -500,
+            cumulativePnl: 500,
+            cumulativePnlPercentage: 5,
+          },
+        ],
+        quantity: '100.000000',
+        overallPnl: 500,
+        overallPnlPercentage: 5,
+      });
     });
-  });
 
-  describe('updateAssetPrices', () => {
-    it('should update prices for all assets', async () => {
-      const mockAssets = [{ id: 'a1', asset_type: 'ERC-20' }];
-      const mockLatestPrice = { price: 100 };
+    it('should return empty asset history when no price history is available', async () => {
+      jest.spyOn(service as any, 'fetchPriceHistory').mockResolvedValue([]);
+      jest.spyOn(service as any, 'createEmptyAssetHistory').mockReturnValue({
+        history: [],
+        quantity: '100.000000',
+        overallPnl: 0,
+        overallPnlPercentage: 0,
+      });
 
-      mockDb.execute.mockResolvedValueOnce(mockAssets);
-      mockDb.executeTakeFirst.mockResolvedValueOnce(mockLatestPrice);
-      mockDb.execute.mockResolvedValueOnce([{ id: 'price1' }]);
+      const result = await service.getAssetHistory(userAssetId, userId);
 
-      const result = await service.updateAssetPrices();
+      expect(result).toEqual({
+        history: [],
+        quantity: '100.000000',
+        overallPnl: 0,
+        overallPnlPercentage: 0,
+      });
+    });
 
-      expect(result).toEqual({ message: 'Asset prices updated successfully' });
+    it('should throw NotFoundException when user asset is not found', async () => {
+      jest
+        .spyOn(service, 'findOne')
+        .mockRejectedValue(new NotFoundException('User asset not found'));
+
+      await expect(
+        service.getAssetHistory(userAssetId, userId),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should use provided start and end dates when fetching price history', async () => {
+      const startDate = new Date('2023-01-01');
+      const endDate = new Date('2023-01-31');
+      const mockFetchPriceHistory = jest
+        .spyOn(service as any, 'fetchPriceHistory')
+        .mockResolvedValue([]);
+
+      await service.getAssetHistory(userAssetId, userId, startDate, endDate);
+
+      expect(mockFetchPriceHistory).toHaveBeenCalledWith(
+        mockUserAsset.asset_id,
+        startDate,
+        endDate,
+      );
     });
   });
 });

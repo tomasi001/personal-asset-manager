@@ -1,41 +1,51 @@
 import {
+  BadRequestException,
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+import { getErrorMessage } from '../utils';
 import { CreateAssetDto } from './dto/create-asset.dto';
+import { AssetType } from './enums/ asset-type.enum';
+import { AssetHistory, MergedUserAsset } from './interfaces/asset-interfaces';
 
 /**
  * AssetService is responsible for managing digital assets in the application.
  * It handles operations such as creating, retrieving, and deleting assets,
  * as well as managing asset prices and calculating performance metrics.
  *
- * This service interacts with the database to perform CRUD operations on users assets
+ * This service interacts with the database to perform CRUD operations on user assets
  * and provides methods for analyzing asset performance over time.
  */
 @Injectable()
 export class AssetService {
+  private readonly logger = new Logger(AssetService.name);
+
   constructor(private readonly databaseService: DatabaseService) {}
 
   /**
    * Validates that token_id is provided for ERC-721 tokens and not for ERC-20 tokens.
    * ERC-721 tokens are unique and require a token ID, while ERC-20 tokens are fungible and don't.
    *
-   * @param {('ERC-20' | 'ERC-721')} assetType - The type of the asset
+   * @param {AssetType} assetType - The type of the asset
    * @param {string} [tokenId] - The token ID of the asset (if applicable)
-   * @throws {Error} If the validation fails
+   * @throws {HttpException} If the validation fails
    */
-  private validateTokenId(
-    assetType: 'ERC-20' | 'ERC-721',
-    tokenId?: string,
-  ): void {
-    if (assetType === 'ERC-721' && !tokenId) {
-      throw new Error('Token ID is required for ERC-721 assets');
+  private validateTokenId(assetType: AssetType, tokenId?: string): void {
+    if (assetType === AssetType.ERC721 && !tokenId) {
+      throw new HttpException(
+        'Token ID is required for ERC-721 assets',
+        HttpStatus.BAD_REQUEST,
+      );
     }
-    if (assetType === 'ERC-20' && tokenId) {
-      throw new Error('Token ID should not be provided for ERC-20 assets');
+    if (assetType === AssetType.ERC20 && tokenId) {
+      throw new HttpException(
+        'Token ID should not be provided for ERC-20 assets',
+        HttpStatus.BAD_REQUEST,
+      );
     }
   }
 
@@ -49,25 +59,28 @@ export class AssetService {
    * @returns {Promise<{ message: string, assetId: string }>} An object containing a success message and the ID of the added asset
    * @throws {HttpException} If there's an error during the creation process
    */
-  async create(createAssetDto: CreateAssetDto, userId: string) {
+  async create(
+    createAssetDto: CreateAssetDto,
+    userId: string,
+  ): Promise<{ message: string; assetId: string }> {
+    this.validateTokenId(createAssetDto.asset_type, createAssetDto.token_id);
+
+    const db = this.databaseService.getDb();
     try {
-      // Validate the token ID based on the asset type
-      this.validateTokenId(createAssetDto.asset_type, createAssetDto.token_id);
+      const asset = await db.transaction().execute(async (trx) => {
+        const existingAsset = await trx
+          .selectFrom('assets')
+          .where('contract_address', '=', createAssetDto.contract_address)
+          .where('chain', '=', createAssetDto.chain)
+          .where('asset_type', '=', createAssetDto.asset_type)
+          .selectAll()
+          .executeTakeFirst();
 
-      const db = this.databaseService.getDb();
+        if (existingAsset) {
+          return existingAsset;
+        }
 
-      // Check if the asset already exists in the assets table
-      let asset = await db
-        .selectFrom('assets')
-        .where('contract_address', '=', createAssetDto.contract_address)
-        .where('chain', '=', createAssetDto.chain)
-        .where('asset_type', '=', createAssetDto.asset_type)
-        .selectAll()
-        .executeTakeFirst();
-
-      // If the asset doesn't exist, create it
-      if (!asset) {
-        const [newAsset] = await db
+        const [newAsset] = await trx
           .insertInto('assets')
           .values({
             name: createAssetDto.name,
@@ -88,17 +101,17 @@ export class AssetService {
             'created_at',
           ])
           .execute();
-        asset = newAsset;
-      }
 
-      // Add the asset to the user's portfolio
+        return newAsset;
+      });
+
       await db
         .insertInto('user_assets')
         .values({
           user_id: userId,
           asset_id: asset.id,
           quantity:
-            createAssetDto.asset_type === 'ERC-20'
+            createAssetDto.asset_type === AssetType.ERC20
               ? createAssetDto.quantity
               : undefined,
         })
@@ -109,11 +122,10 @@ export class AssetService {
         assetId: asset.id,
       };
     } catch (error) {
-      // Handle specific errors
-      if (error instanceof Error) {
-        throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+      this.logger.error(`Error creating asset: ${getErrorMessage(error)}`);
+      if (error instanceof HttpException) {
+        throw error;
       }
-      // Handle unexpected errors
       throw new HttpException(
         'An unexpected error occurred',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -125,27 +137,35 @@ export class AssetService {
    * Retrieves all assets in a user's portfolio.
    *
    * @param {string} userId - ID of the user whose assets are being retrieved
-   * @returns {Promise<Array<{ userAssetId: string, assetId: string, name: string, asset_type: string, description: string, contract_address: string, chain: string, token_id: string | null, created_at: Date, quantity: number | null }>>} An array of assets with their details, quantities, and relevant IDs
+   * @returns {Promise<MergedUserAsset[]>} An array of assets with their details, quantities, and relevant IDs
    */
-  async findAll(userId: string) {
+  async findAll(userId: string): Promise<MergedUserAsset[]> {
     const db = this.databaseService.getDb();
-    return db
+    const results = await db
       .selectFrom('user_assets')
       .innerJoin('assets', 'assets.id', 'user_assets.asset_id')
       .where('user_assets.user_id', '=', userId)
       .select([
-        'user_assets.id as userAssetId',
-        'assets.id as assetId',
+        'user_assets.id',
+        'user_assets.user_id',
+        'user_assets.asset_id',
+        'user_assets.quantity',
+        'user_assets.created_at',
         'assets.name',
         'assets.asset_type',
         'assets.description',
         'assets.contract_address',
         'assets.chain',
         'assets.token_id',
-        'assets.created_at',
-        'user_assets.quantity',
+        'assets.created_at as asset_created_at',
       ])
       .execute();
+
+    return results.map((result) => ({
+      ...result,
+      asset_type:
+        result.asset_type === 'ERC-20' ? AssetType.ERC20 : AssetType.ERC721,
+    }));
   }
 
   /**
@@ -153,10 +173,10 @@ export class AssetService {
    *
    * @param {string} userAssetId - ID of the user-asset entry to retrieve
    * @param {string} userId - ID of the user who owns the asset
-   * @returns {Promise<{ userAssetId: string, assetId: string, name: string, asset_type: string, description: string, contract_address: string, chain: string, token_id: string | null, created_at: Date, quantity: number | null }>} The asset details if found
+   * @returns {Promise<MergedUserAsset>} The asset details if found
    * @throws {NotFoundException} If the asset is not found in the user's portfolio
    */
-  async findOne(userAssetId: string, userId: string) {
+  async findOne(userAssetId: string, userId: string): Promise<MergedUserAsset> {
     const db = this.databaseService.getDb();
     const result = await db
       .selectFrom('user_assets')
@@ -164,16 +184,18 @@ export class AssetService {
       .where('user_assets.id', '=', userAssetId)
       .where('user_assets.user_id', '=', userId)
       .select([
-        'user_assets.id as userAssetId',
-        'assets.id as assetId',
+        'user_assets.id',
+        'user_assets.user_id',
+        'user_assets.asset_id',
+        'user_assets.quantity',
+        'user_assets.created_at',
         'assets.name',
         'assets.asset_type',
         'assets.description',
         'assets.contract_address',
         'assets.chain',
         'assets.token_id',
-        'assets.created_at',
-        'user_assets.quantity',
+        'assets.created_at as asset_created_at',
       ])
       .executeTakeFirst();
 
@@ -183,8 +205,13 @@ export class AssetService {
       );
     }
 
-    return result;
+    return {
+      ...result,
+      asset_type:
+        result.asset_type === 'ERC-20' ? AssetType.ERC20 : AssetType.ERC721,
+    };
   }
+
   /**
    * Removes a specific asset entry from a user's portfolio.
    *
@@ -193,10 +220,12 @@ export class AssetService {
    * @returns {Promise<{ message: string }>} An object containing a success message
    * @throws {NotFoundException} If the user-asset entry is not found
    */
-  async remove(userAssetId: string, userId: string) {
+  async remove(
+    userAssetId: string,
+    userId: string,
+  ): Promise<{ message: string }> {
     const db = this.databaseService.getDb();
 
-    // Remove the specific user-asset entry from the user's portfolio
     const result = await db
       .deleteFrom('user_assets')
       .where('id', '=', userAssetId)
@@ -219,117 +248,112 @@ export class AssetService {
    * @param {string} userId - ID of the user who owns the asset
    * @param {Date} [startDate] - Optional start date for the history range
    * @param {Date} [endDate] - Optional end date for the history range
-   * @returns {Promise<{
-   *   history: Array<{
-   *     date: Date,
-   *     price: number,
-   *     value: number,
-   *     dailyPnl: number,
-   *     cumulativePnl: number,
-   *     cumulativePnlPercentage: number
-   *   }>,
-   *   quantity: number | null,
-   *   overallPnl: number,
-   *   overallPnlPercentage: number
-   * }>} An object containing the price history and performance metrics
+   * @returns {Promise<AssetHistory>} An object containing the price history and performance metrics
    * @throws {NotFoundException} If the user asset is not found
-   * @throws {Error} If the ERC-20 asset has an invalid quantity
+   * @throws {HttpException} If the ERC-20 asset has an invalid quantity
    */
   async getAssetHistory(
     userAssetId: string,
     userId: string,
     startDate?: Date,
     endDate?: Date,
-  ) {
-    const db = this.databaseService.getDb();
-
-    // Fetch the user asset and related asset information
+  ): Promise<AssetHistory> {
     const userAsset = await this.findOne(userAssetId, userId);
-    if (!userAsset) {
-      throw new NotFoundException(
-        `User asset with ID ${userAssetId} not found for this user`,
-      );
-    }
+    this.validateUserAsset(userAsset);
+    const priceHistory = await this.fetchPriceHistory(
+      userAsset.asset_id,
+      startDate,
+      endDate,
+    );
 
-    if (
-      userAsset.asset_type === 'ERC-20' &&
-      (userAsset.quantity === null || userAsset.quantity === undefined)
-    ) {
-      throw new Error(
-        `ERC-20 user asset with ID ${userAssetId} has an invalid quantity`,
-      );
-    }
+    // if (
+    //   userAsset.asset_type === AssetType.ERC20 &&
+    //   (userAsset.quantity === null || userAsset.quantity === undefined)
+    // ) {
+    //   throw new HttpException(
+    //     `ERC-20 user asset with ID ${userAssetId} has an invalid quantity`,
+    //     HttpStatus.BAD_REQUEST,
+    //   );
+    // }
 
-    // Fetch the price history
-    let query = db
-      .selectFrom('asset_daily_prices')
-      .where('asset_id', '=', userAsset.assetId)
-      .select(['price', 'recorded_at']);
+    // const db = this.databaseService.getDb();
+    // let query = db
+    //   .selectFrom('asset_daily_prices')
+    //   .where('asset_id', '=', userAsset.asset_id)
+    //   .select(['price', 'recorded_at']);
 
-    // Add date range filter if provided
-    if (startDate) {
-      query = query.where('recorded_at', '>=', startDate);
-    }
-    if (endDate) {
-      query = query.where('recorded_at', '<=', endDate);
-    }
+    // if (startDate) {
+    //   query = query.where('recorded_at', '>=', startDate);
+    // }
+    // if (endDate) {
+    //   query = query.where('recorded_at', '<=', endDate);
+    // }
 
-    const priceHistory = await query.orderBy('recorded_at', 'asc').execute();
+    // const priceHistory = await query.orderBy('recorded_at', 'asc').execute();
 
-    // If no price history is found, return empty results
     if (priceHistory.length === 0) {
-      return {
-        history: [],
-        pnl: 0,
-        pnlPercentage: 0,
-        quantity: userAsset.quantity,
-      };
+      return this.createEmptyAssetHistory(userAsset);
     }
 
-    const initialPrice = priceHistory[0].price;
-    let cumulativePnl = 0;
+    // const initialPrice = priceHistory[0].price;
+    // let cumulativePnl = 0;
 
-    // Calculate daily performance metrics
-    const history = priceHistory.map((entry, index) => {
-      const value =
-        userAsset.asset_type === 'ERC-20'
-          ? entry.price * userAsset.quantity
-          : entry.price;
-      const dailyPnl =
-        index > 0
-          ? value -
-            (userAsset.asset_type === 'ERC-20'
-              ? priceHistory[index - 1].price * userAsset.quantity
-              : priceHistory[index - 1].price)
-          : 0;
-      cumulativePnl += dailyPnl;
-      const cumulativePnlPercentage =
-        ((entry.price - initialPrice) / initialPrice) * 100;
+    // const history = priceHistory.map((entry, index) => {
+    //   const value = this.calculateAssetValue(entry.price, userAsset);
+    //   const dailyPnl =
+    //     index > 0
+    //       ? value -
+    //         this.calculateAssetValue(priceHistory[index - 1].price, userAsset)
+    //       : 0;
+    //   cumulativePnl += dailyPnl;
+    //   const cumulativePnlPercentage =
+    //     ((Number(entry.price) - Number(initialPrice)) / Number(initialPrice)) *
+    //     100;
 
-      return {
-        date: entry.recorded_at,
-        price: entry.price,
-        value,
-        dailyPnl,
-        cumulativePnl,
-        cumulativePnlPercentage,
-      };
-    });
+    //   return {
+    //     date: entry.recorded_at.toISOString(),
+    //     price: entry.price.toFixed(6),
+    //     value: Math.round(value),
+    //     dailyPnl: Math.round(dailyPnl),
+    //     cumulativePnl: Math.round(cumulativePnl),
+    //     cumulativePnlPercentage: Number(cumulativePnlPercentage.toFixed(2)),
+    //   };
+    // });
 
-    // Calculate overall performance metrics
-    const currentPrice = priceHistory[priceHistory.length - 1].price;
-    const overallPnl =
-      userAsset.asset_type === 'ERC-20'
-        ? (currentPrice - initialPrice) * userAsset.quantity
-        : currentPrice - initialPrice;
-    const overallPnlPercentage =
-      ((currentPrice - initialPrice) / initialPrice) * 100;
+    // const currentPrice = Number(priceHistory[priceHistory.length - 1].price);
+    // const overallPnl = this.calculateOverallPnl(
+    //   currentPrice,
+    //   initialPrice,
+    //   userAsset,
+    // );
+    // const overallPnlPercentage =
+    //   ((currentPrice - Number(initialPrice)) / Number(initialPrice)) * 100;
+
+    // return {
+    //   history,
+    //   quantity: userAsset.quantity.toFixed(6),
+    //   overallPnl: Math.round(overallPnl),
+    //   overallPnlPercentage: Number(overallPnlPercentage.toFixed(2)),
+    // };
+
+    const initialPrice = Number(priceHistory[0].price);
+    const currentPrice = Number(priceHistory[priceHistory.length - 1].price);
+
+    const history = this.calculateHistoryMetrics(
+      priceHistory,
+      userAsset,
+      initialPrice,
+    );
+    const overallMetrics = this.calculateOverallMetrics(
+      currentPrice,
+      initialPrice,
+      userAsset,
+    );
 
     return {
       history,
-      quantity: userAsset.quantity,
-      overallPnl,
-      overallPnlPercentage,
+      quantity: this.formatQuantity(userAsset.quantity),
+      ...overallMetrics,
     };
   }
 
@@ -340,49 +364,158 @@ export class AssetService {
    *
    * @returns {Promise<{ message: string }>} An object containing a success message
    */
-  async updateAssetPrices() {
+  async updateAssetPrices(): Promise<{ message: string }> {
     const db = this.databaseService.getDb();
 
-    // Get all assets from the database
     const assets = await db
       .selectFrom('assets')
       .select(['id', 'asset_type'])
       .execute();
 
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Set to start of day
+    today.setHours(0, 0, 0, 0);
 
-    for (const asset of assets) {
-      // Get the latest price for this asset
-      const latestPrice = await db
-        .selectFrom('asset_daily_prices')
-        .where('asset_id', '=', asset.id)
-        .orderBy('recorded_at', 'desc')
-        .select('price')
-        .limit(1)
-        .executeTakeFirst();
+    await db.transaction().execute(async (trx) => {
+      for (const asset of assets) {
+        const latestPrice = await trx
+          .selectFrom('asset_daily_prices')
+          .where('asset_id', '=', asset.id)
+          .orderBy('recorded_at', 'desc')
+          .select('price')
+          .limit(1)
+          .executeTakeFirst();
 
-      let newPrice;
-      if (latestPrice) {
-        // Generate a random price fluctuation between -5% and +5%
-        const fluctuation = (Math.random() - 0.5) * 0.1;
-        newPrice = latestPrice.price * (1 + fluctuation);
-      } else {
-        // If no previous price exists, generate a random price between 1 and 1000
-        newPrice = Math.random() * 999 + 1;
+        const newPrice = latestPrice
+          ? latestPrice.price * (1 + (Math.random() - 0.5) * 0.1)
+          : Math.random() * 999 + 1;
+
+        await trx
+          .insertInto('asset_daily_prices')
+          .values({
+            asset_id: asset.id,
+            price: newPrice,
+            recorded_at: today.toISOString(),
+          })
+          .execute();
       }
-
-      // Insert new price into asset_daily_prices
-      await db
-        .insertInto('asset_daily_prices')
-        .values({
-          asset_id: asset.id,
-          price: newPrice,
-          recorded_at: today.toISOString(),
-        })
-        .execute();
-    }
+    });
 
     return { message: 'Asset prices updated successfully' };
+  }
+
+  private calculateAssetValue(
+    price: number,
+    userAsset: MergedUserAsset,
+  ): number {
+    return userAsset.asset_type === AssetType.ERC20
+      ? price * Number(userAsset.quantity)
+      : price;
+  }
+
+  private calculateOverallPnl(
+    currentPrice: number,
+    initialPrice: number,
+    userAsset: MergedUserAsset,
+  ): number {
+    return userAsset.asset_type === AssetType.ERC20
+      ? (currentPrice - initialPrice) * Number(userAsset.quantity)
+      : currentPrice - initialPrice;
+  }
+
+  private validateUserAsset(userAsset: MergedUserAsset): void {
+    if (
+      userAsset.asset_type === AssetType.ERC20 &&
+      (userAsset.quantity === null || userAsset.quantity === undefined)
+    ) {
+      throw new BadRequestException(
+        `ERC-20 user asset with ID ${userAsset.id} has an invalid quantity`,
+      );
+    }
+  }
+
+  private async fetchPriceHistory(
+    assetId: string,
+    startDate?: Date,
+    endDate?: Date,
+  ) {
+    const db = this.databaseService.getDb();
+    let query = db
+      .selectFrom('asset_daily_prices')
+      .where('asset_id', '=', assetId)
+      .select(['price', 'recorded_at']);
+
+    if (startDate) query = query.where('recorded_at', '>=', startDate);
+    if (endDate) query = query.where('recorded_at', '<=', endDate);
+
+    return query.orderBy('recorded_at', 'asc').execute();
+  }
+
+  private formatQuantity(quantity: string | number | null | undefined): string {
+    if (quantity === null || quantity === undefined) {
+      return '0';
+    }
+    const numericQuantity = Number(quantity);
+    return isNaN(numericQuantity) ? '0' : numericQuantity.toFixed(6);
+  }
+
+  private createEmptyAssetHistory(userAsset: MergedUserAsset): AssetHistory {
+    return {
+      history: [],
+      quantity: this.formatQuantity(userAsset.quantity),
+      overallPnl: 0,
+      overallPnlPercentage: 0,
+    };
+  }
+
+  private calculateHistoryMetrics(
+    priceHistory: Array<{ price: number; recorded_at: Date }>,
+    userAsset: MergedUserAsset,
+    initialPrice: number,
+  ): AssetHistory['history'] {
+    let cumulativePnl = 0;
+
+    return priceHistory.map((entry, index) => {
+      const price = Number(entry.price);
+      const value = this.calculateAssetValue(price, userAsset);
+      const dailyPnl =
+        index > 0
+          ? value -
+            this.calculateAssetValue(
+              Number(priceHistory[index - 1].price),
+              userAsset,
+            )
+          : 0;
+      cumulativePnl += dailyPnl;
+      const cumulativePnlPercentage =
+        ((price - initialPrice) / initialPrice) * 100;
+
+      return {
+        date: entry.recorded_at.toISOString(),
+        price: price.toFixed(6),
+        value: Math.round(value),
+        dailyPnl: Math.round(dailyPnl),
+        cumulativePnl: Math.round(cumulativePnl),
+        cumulativePnlPercentage: Number(cumulativePnlPercentage.toFixed(2)),
+      };
+    });
+  }
+
+  private calculateOverallMetrics(
+    currentPrice: number,
+    initialPrice: number,
+    userAsset: MergedUserAsset,
+  ): Pick<AssetHistory, 'overallPnl' | 'overallPnlPercentage'> {
+    const overallPnl = this.calculateOverallPnl(
+      currentPrice,
+      initialPrice,
+      userAsset,
+    );
+    const overallPnlPercentage =
+      ((currentPrice - initialPrice) / initialPrice) * 100;
+
+    return {
+      overallPnl: Math.round(overallPnl),
+      overallPnlPercentage: Number(overallPnlPercentage.toFixed(2)),
+    };
   }
 }

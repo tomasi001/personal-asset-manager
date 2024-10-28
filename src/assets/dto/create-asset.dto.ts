@@ -1,5 +1,6 @@
-import { IsString, IsEnum, IsOptional, IsNumber } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
+import { AssetType } from '../enums/ asset-type.enum';
 
 export class CreateAssetDto {
   @ApiProperty({ description: 'The name of the asset' })
@@ -7,11 +8,11 @@ export class CreateAssetDto {
   name: string;
 
   @ApiProperty({
-    enum: ['ERC-20', 'ERC-721'],
+    enum: AssetType,
     description: 'The type of the asset',
   })
-  @IsEnum(['ERC-20', 'ERC-721'])
-  asset_type: 'ERC-20' | 'ERC-721';
+  @IsEnum(AssetType)
+  asset_type: AssetType;
 
   @ApiPropertyOptional({ description: 'A description of the asset' })
   @IsString()

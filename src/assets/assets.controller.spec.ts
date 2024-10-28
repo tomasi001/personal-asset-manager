@@ -5,6 +5,8 @@ import { CreateAssetDto } from './dto/create-asset.dto';
 import { JwtService } from '@nestjs/jwt';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
+import { AssetType } from './enums/ asset-type.enum';
+import { AssetHistory, MergedUserAsset } from './interfaces/asset-interfaces';
 
 describe('AssetController', () => {
   let controller: AssetController;
@@ -43,7 +45,7 @@ describe('AssetController', () => {
     it('should create an asset', async () => {
       const createAssetDto: CreateAssetDto = {
         name: 'name',
-        asset_type: 'ERC-20',
+        asset_type: AssetType.ERC20, // Use the enum value
         description: 'description',
         contract_address: 'contract_address',
         chain: 'Ethereum',
@@ -66,30 +68,34 @@ describe('AssetController', () => {
   describe('findAll', () => {
     it('should return all assets for a user', async () => {
       const userId = 'user123';
-      const expectedResult = [
+      const expectedResult: MergedUserAsset[] = [
         {
-          userAssetId: 'userAsset1',
-          assetId: 'asset1',
-          name: 'Asset 1',
-          asset_type: 'ERC-20' as const,
-          description: 'Description for Asset 1',
+          id: '1',
+          user_id: 'user123',
+          asset_id: 'asset1',
+          quantity: 100,
+          created_at: new Date(),
+          name: 'Test Asset',
+          asset_type: AssetType.ERC20,
+          description: 'Test Description',
           contract_address: '0x1234567890123456789012345678901234567890',
           chain: 'Ethereum',
-          token_id: '',
-          created_at: new Date(),
-          quantity: 100,
+          token_id: null,
+          asset_created_at: new Date(),
         },
         {
-          userAssetId: 'userAsset2',
-          assetId: 'asset2',
-          name: 'Asset 2',
-          asset_type: 'ERC-721' as const,
-          description: 'Description for Asset 2',
+          id: '2',
+          user_id: 'user1234',
+          asset_id: 'asset2',
+          quantity: 1,
+          created_at: new Date(),
+          name: 'Test Asset 2',
+          asset_type: AssetType.ERC721,
+          description: 'Test Description 2',
           contract_address: '0x0987654321098765432109876543210987654321',
           chain: 'Polygon',
           token_id: '1234',
-          created_at: new Date(),
-          quantity: 1,
+          asset_created_at: new Date(),
         },
       ];
 
@@ -105,17 +111,19 @@ describe('AssetController', () => {
     it('should return a single asset', async () => {
       const assetId = 'asset1';
       const userId = 'user123';
-      const expectedResult = {
-        userAssetId: 'userAsset1',
-        assetId: 'asset1',
-        name: 'Asset 1',
-        asset_type: 'ERC-20' as const,
-        description: 'Description for Asset 1',
+      const expectedResult: MergedUserAsset = {
+        id: '1',
+        user_id: 'user123',
+        asset_id: 'asset1',
+        quantity: 100,
+        created_at: new Date(),
+        name: 'Test Asset',
+        asset_type: AssetType.ERC20,
+        description: 'Test Description',
         contract_address: '0x1234567890123456789012345678901234567890',
         chain: 'Ethereum',
-        token_id: '',
-        created_at: new Date(),
-        quantity: 100,
+        token_id: null,
+        asset_created_at: new Date(),
       };
 
       jest.spyOn(assetService, 'findOne').mockResolvedValue(expectedResult);
@@ -146,26 +154,26 @@ describe('AssetController', () => {
       const userId = 'user123';
       const startDate = '2023-01-01';
       const endDate = '2023-12-31';
-      const expectedResult = {
+      const expectedResult: AssetHistory = {
         history: [
           {
-            date: new Date('2023-01-01'),
-            price: 100,
+            date: new Date().toISOString(), // Convert Date to string
+            price: '100',
             value: 1000,
             dailyPnl: 0,
             cumulativePnl: 0,
             cumulativePnlPercentage: 0,
           },
           {
-            date: new Date('2023-12-31'),
-            price: 150,
+            date: new Date().toISOString(),
+            price: '150',
             value: 1500,
             dailyPnl: 500,
             cumulativePnl: 500,
             cumulativePnlPercentage: 50,
           },
         ],
-        quantity: 10,
+        quantity: '10',
         overallPnl: 500,
         overallPnlPercentage: 50,
       };
