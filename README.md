@@ -139,8 +139,10 @@ pnpm run clear-db
 
 ## Authentication Architecture
 
+## Authentication Architecture
+
 <p align="center">
-  <img src="./auth-architecture.png" alt="Authentication Architecture" width="700">
+  <img src="https://github.com/tomasi001/personal-asset-manager/blob/main/auth-architecture.PNG?raw=true" alt="Authentication Architecture" width="700">
 </p>
 
 This diagram illustrates the complete authentication flow in our Personal Asset Manager application:
