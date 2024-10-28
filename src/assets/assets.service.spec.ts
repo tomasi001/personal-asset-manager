@@ -3,7 +3,12 @@ import { AssetService } from './assets.service';
 import { DatabaseService } from '../database/database.service';
 import { CreateAssetDto } from './dto/create-asset.dto';
 import { AssetType } from './enums/ asset-type.enum';
-import { HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+  NotFoundException,
+} from '@nestjs/common';
 import { MergedUserAsset } from './interfaces/asset-interfaces';
 
 describe('AssetService', () => {
@@ -92,6 +97,83 @@ describe('AssetService', () => {
       await expect(service.create(createAssetDto, userId)).rejects.toThrow(
         new HttpException(
           'Token ID should not be provided for ERC-20 assets',
+          HttpStatus.BAD_REQUEST,
+        ),
+      );
+    });
+
+    it('should throw HttpException if quantity is provided for ERC721 asset', async () => {
+      const createAssetDto: CreateAssetDto = {
+        name: 'Test NFT',
+        asset_type: AssetType.ERC721,
+        description: 'Test NFT Description',
+        contract_address: '0x1234567890123456789012345678901234567890',
+        chain: 'ethereum',
+        token_id: '1',
+        quantity: 1, // This should cause an error for ERC721
+      };
+      const userId = 'user123';
+
+      await expect(service.create(createAssetDto, userId)).rejects.toThrow(
+        new HttpException(
+          'Quantity should not be provided for ERC-721 assets',
+          HttpStatus.BAD_REQUEST,
+        ),
+      );
+    });
+
+    it('should throw HttpException if quantity is not provided for ERC20 asset', async () => {
+      const createAssetDto: CreateAssetDto = {
+        name: 'Test Token',
+        asset_type: AssetType.ERC20,
+        description: 'Test Token Description',
+        contract_address: '0x1234567890123456789012345678901234567890',
+        chain: 'ethereum',
+        // quantity is missing
+      };
+      const userId = 'user123';
+
+      await expect(service.create(createAssetDto, userId)).rejects.toThrow(
+        new HttpException(
+          'A positive quantity must be provided for ERC-20 assets',
+          HttpStatus.BAD_REQUEST,
+        ),
+      );
+    });
+
+    it('should throw HttpException if quantity is zero or negative for ERC20 asset', async () => {
+      const createAssetDto: CreateAssetDto = {
+        name: 'Test Token',
+        asset_type: AssetType.ERC20,
+        description: 'Test Token Description',
+        contract_address: '0x1234567890123456789012345678901234567890',
+        chain: 'ethereum',
+        quantity: 0, // This should cause an error for ERC20
+      };
+      const userId = 'user123';
+
+      await expect(service.create(createAssetDto, userId)).rejects.toThrow(
+        new HttpException(
+          'A positive quantity must be provided for ERC-20 assets',
+          HttpStatus.BAD_REQUEST,
+        ),
+      );
+    });
+
+    it('should throw HttpException if token_id is missing for ERC721 asset', async () => {
+      const createAssetDto: CreateAssetDto = {
+        name: 'Test NFT',
+        asset_type: AssetType.ERC721,
+        description: 'Test NFT Description',
+        contract_address: '0x1234567890123456789012345678901234567890',
+        chain: 'ethereum',
+        // token_id is missing
+      };
+      const userId = 'user123';
+
+      await expect(service.create(createAssetDto, userId)).rejects.toThrow(
+        new HttpException(
+          'Token ID is required for ERC-721 assets',
           HttpStatus.BAD_REQUEST,
         ),
       );
@@ -338,6 +420,40 @@ describe('AssetService', () => {
 
       await expect(service.remove(userAssetId, userId)).rejects.toThrow(
         new NotFoundException('User-asset entry not found in the portfolio'),
+      );
+    });
+
+    it('should throw BadRequestException if delete operation fails', async () => {
+      const userAssetId = 'userAsset1';
+      const userId = 'user123';
+
+      jest.spyOn(databaseService, 'getDb').mockReturnValue({
+        deleteFrom: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        executeTakeFirst: jest
+          .fn()
+          .mockRejectedValue(new Error('Database error')),
+      } as any);
+
+      await expect(service.remove(userAssetId, userId)).rejects.toThrow(
+        new BadRequestException('Failed to remove asset from user portfolio'),
+      );
+    });
+
+    it("should throw BadRequestException if there's a database constraint violation", async () => {
+      const userAssetId = 'userAsset1';
+      const userId = 'user123';
+
+      jest.spyOn(databaseService, 'getDb').mockReturnValue({
+        deleteFrom: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        executeTakeFirst: jest
+          .fn()
+          .mockRejectedValue(new Error('foreign key constraint violation')),
+      } as any);
+
+      await expect(service.remove(userAssetId, userId)).rejects.toThrow(
+        new BadRequestException('Failed to remove asset from user portfolio'),
       );
     });
   });

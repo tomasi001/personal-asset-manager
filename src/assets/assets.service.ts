@@ -50,6 +50,32 @@ export class AssetService {
   }
 
   /**
+   * Validates the quantity for different asset types.
+   * ERC-721 tokens should not have a quantity, while ERC-20 tokens must have a positive quantity.
+   *
+   * @param {AssetType} assetType - The type of the asset
+   * @param {number} [quantity] - The quantity of the asset (if applicable)
+   * @throws {HttpException} If the validation fails
+   */
+  private validateTokenQuantity(assetType: AssetType, quantity?: number): void {
+    if (assetType === AssetType.ERC721 && quantity !== undefined) {
+      throw new HttpException(
+        'Quantity should not be provided for ERC-721 assets',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    if (
+      assetType === AssetType.ERC20 &&
+      (quantity === undefined || quantity <= 0)
+    ) {
+      throw new HttpException(
+        'A positive quantity must be provided for ERC-20 assets',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  /**
    * Creates a new asset and adds it to the user's portfolio.
    * If the asset already exists in the global asset list, it's added to the user's portfolio.
    * If it doesn't exist, it's first created in the global asset list, then added to the user's portfolio.
@@ -63,6 +89,10 @@ export class AssetService {
     createAssetDto: CreateAssetDto,
     userId: string,
   ): Promise<{ message: string; assetId: string }> {
+    this.validateTokenQuantity(
+      createAssetDto.asset_type,
+      createAssetDto.quantity,
+    );
     this.validateTokenId(createAssetDto.asset_type, createAssetDto.token_id);
 
     const db = this.databaseService.getDb();
@@ -218,7 +248,8 @@ export class AssetService {
    * @param {string} userAssetId - ID of the user-asset entry to remove
    * @param {string} userId - ID of the user who owns the asset
    * @returns {Promise<{ message: string }>} An object containing a success message
-   * @throws {NotFoundException} If the user-asset entry is not found
+   * @throws {NotFoundException} If the user-asset entry is not found in the portfolio
+   * @throws {BadRequestException} If there's a database error during the removal process
    */
   async remove(
     userAssetId: string,
@@ -226,19 +257,29 @@ export class AssetService {
   ): Promise<{ message: string }> {
     const db = this.databaseService.getDb();
 
-    const result = await db
-      .deleteFrom('user_assets')
-      .where('id', '=', userAssetId)
-      .where('user_id', '=', userId)
-      .executeTakeFirst();
+    try {
+      const result = await db
+        .deleteFrom('user_assets')
+        .where('id', '=', userAssetId)
+        .where('user_id', '=', userId)
+        .executeTakeFirst();
 
-    if (!result || result.numDeletedRows === 0n) {
-      throw new NotFoundException(
-        'User-asset entry not found in the portfolio',
+      if (!result || result.numDeletedRows === 0n) {
+        throw new NotFoundException(
+          'User-asset entry not found in the portfolio',
+        );
+      }
+
+      return { message: 'Asset removed from user portfolio successfully' };
+    } catch (error) {
+      this.logger.error(`Failed to remove asset: ${getErrorMessage(error)}`);
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new BadRequestException(
+        'Failed to remove asset from user portfolio',
       );
     }
-
-    return { message: 'Asset removed from user portfolio successfully' };
   }
 
   /**
