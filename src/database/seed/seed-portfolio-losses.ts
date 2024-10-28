@@ -4,6 +4,14 @@ import { getKyselyInstance } from '../kysely.config';
 
 // simulate a portfolio with only losing assets
 
+/**
+ * Privy ID Usage for Seeding:
+ * 1. Log in to Privy to obtain your access token.
+ * 2. Use the token to authenticate through the Swagger API documentation.
+ * 3. After first authentication, your Privy ID will be stored in the database.
+ * 4. Use this Privy ID in your seed scripts for consistent user simulation across different scenarios.
+ */
+
 async function seedPortfolioLosses() {
   const db: Kysely<Database> = getKyselyInstance();
 

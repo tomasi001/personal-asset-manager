@@ -3,6 +3,8 @@ import {
   Controller,
   Delete,
   Get,
+  HttpException,
+  HttpStatus,
   Param,
   Post,
   Query,
@@ -51,9 +53,9 @@ export class AssetController {
     return this.assetService.findAll(userId);
   }
 
-  @Get(':assetId')
+  @Get(':userAssetId')
   @ApiOperation({ summary: 'Get a specific asset from user portfolio' })
-  @ApiParam({ name: 'assetId', description: 'Asset ID' })
+  @ApiParam({ name: 'userAssetId', description: 'Asset ID' })
   @ApiResponse({
     status: 200,
     description: 'Return the asset from user portfolio.',
@@ -63,15 +65,15 @@ export class AssetController {
     status: 404,
     description: 'Asset not found in user portfolio.',
   })
-  findOne(@Param('assetId') assetId: string, @UserId() userId: string) {
-    return this.assetService.findOne(assetId, userId);
+  findOne(@Param('userAssetId') userAssetId: string, @UserId() userId: string) {
+    return this.assetService.findOne(userAssetId, userId);
   }
 
-  @Delete(':assetId')
+  @Delete(':userAssetId')
   @ApiOperation({
     summary: 'Remove a specific asset entry from user portfolio',
   })
-  @ApiParam({ name: 'assetId', description: 'User-Asset ID' })
+  @ApiParam({ name: 'userAssetId', description: 'User-Asset ID' })
   @ApiResponse({
     status: 200,
     description:
@@ -81,13 +83,13 @@ export class AssetController {
     status: 404,
     description: 'User-asset entry not found in the portfolio.',
   })
-  remove(@Param('assetId') assetId: string, @UserId() userId: string) {
-    return this.assetService.remove(assetId, userId);
+  remove(@Param('userAssetId') userAssetId: string, @UserId() userId: string) {
+    return this.assetService.remove(userAssetId, userId);
   }
 
-  @Get(':assetId/history')
+  @Get(':userAssetId/history')
   @ApiOperation({ summary: 'Get asset price history' })
-  @ApiParam({ name: 'assetId', description: 'Asset ID' })
+  @ApiParam({ name: 'userAssetId', description: 'Asset ID' })
   @ApiQuery({
     name: 'startDate',
     required: false,
@@ -101,13 +103,13 @@ export class AssetController {
   @ApiResponse({ status: 200, description: 'Return the asset price history.' })
   @ApiResponse({ status: 404, description: 'Asset not found.' })
   getAssetHistory(
-    @Param('assetId') assetId: string,
+    @Param('userAssetId') userAssetId: string,
     @UserId() userId: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
     return this.assetService.getAssetHistory(
-      assetId,
+      userAssetId,
       userId,
       startDate ? new Date(startDate) : undefined,
       endDate ? new Date(endDate) : undefined,
@@ -120,9 +122,39 @@ export class AssetController {
     status: 200,
     description: 'Asset prices updated successfully.',
   })
+  @ApiResponse({
+    status: 400,
+    description: 'Error updating asset prices.',
+  })
   async manualUpdatePrices() {
-    await this.updatePrices();
-    return { message: 'Asset prices updated successfully' };
+    try {
+      await this.updatePrices();
+      return { message: 'Asset prices updated successfully' };
+    } catch (error: unknown) {
+      // Log the error for debugging purposes
+      console.error('Error updating asset prices:', error);
+
+      // Check if error is an instance of Error
+      if (error instanceof Error) {
+        // Check for specific error types
+        if (
+          error.message.includes(
+            'duplicate key value violates unique constraint',
+          )
+        ) {
+          throw new HttpException(
+            'Asset prices have already been updated for this time period.',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+      }
+
+      // Generic error response
+      throw new HttpException(
+        'Error updating asset prices. Please try again later.',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   @Cron('0 0 * * *') // Run at midnight every day

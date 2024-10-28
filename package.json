@@ -20,10 +20,10 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "migrate": "ts-node ./src/database/migrations/migrate.ts",
     "seed": "ts-node ./src/database/seed/seed.ts",
-    "clear-db": "ts-node ./src/database/seed/clear-tables.ts",
     "seed-no-assets": "ts-node ./src/database/seed/seed-no-assets.ts",
     "seed-losses": "ts-node ./src/database/seed/seed-portfolio-losses.ts",
-    "seed-mixed": "ts-node ./src/database/seed/seed-mixed-portfolio.ts"
+    "seed-mixed": "ts-node ./src/database/seed/seed-mixed-portfolio.ts",
+    "clear-db": "ts-node ./src/database/seed/clear-tables.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
