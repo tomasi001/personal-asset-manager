@@ -141,9 +141,9 @@ export class AssetService {
           user_id: userId,
           asset_id: asset.id,
           quantity:
-            createAssetDto.asset_type === AssetType.ERC20
-              ? createAssetDto.quantity
-              : undefined,
+            createAssetDto.asset_type === AssetType.ERC721
+              ? 1
+              : createAssetDto.quantity,
         })
         .execute();
 

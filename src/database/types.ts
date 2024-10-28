@@ -39,7 +39,7 @@ export interface UserAssetTable {
   id: Generated<string>; // UUID Primary Key
   user_id: string; // Foreign Key to users table
   asset_id: string; // Foreign Key to assets table
-  quantity?: number; // Quantity for ERC-20 tokens (default 0)
+  quantity?: number; // Quantity for ERC-20 tokens, defaults to 1 for ERC-721
   created_at: ColumnType<Date, string | undefined, never>; // Timestamp of relationship creation
 }
 
